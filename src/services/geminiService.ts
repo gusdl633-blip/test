@@ -69,6 +69,7 @@ export interface CanonicalSajuResult {
     currentYear: string;
   };
   sinsal: string[];
+  gyeok: string;
   tags: string[];
   generatedAt: string;
   version: string;
@@ -78,21 +79,25 @@ export async function generateSajuSummary(profile: SajuProfile): Promise<Canonic
   const profileKey = `${profile.birthDate}|${profile.birthTime || '00:00'}|${profile.calendarType}|${profile.location || 'none'}|${profile.gender}`;
   
   const systemInstruction = `당신은 초고정/결정적 사주 데이터를 반환하는 "Canonical Saju Data Engine"입니다.
-해석이나 조언을 절대 하지 마십시오. 오직 입력값 기반의 고정 계산 결과만 JSON으로 반환합니다.
+당신은 사주를 "계산"하거나 "추정"하지 않습니다. 표준 만세력 알고리즘에 따라 산출된 고정된 결과만을 반환합니다.
 
 [최상위 절대 규칙]
-1. 동일 입력 = 동일 출력 (Deterministic). 랜덤성 배제.
-2. 사주 원국(4주)은 한자와 한글 매핑을 엄격히 준수합니다.
-   천간: 甲=갑, 乙=을, 丙=병, 丁=정, 戊=무, 己=기, 庚=경, 辛=신, 壬=임, 癸=계
-   지지: 子=자, 丑=축, 寅=인, 卯=묘, 辰=진, 巳=사, 午=오, 未=미, 申=신, 酉=유, 戌=술, 亥=해
-3. 오행 분포는 8자 기준으로 계산하며, 합계는 반드시 8이어야 합니다.
-4. 신살은 고정 리스트에서만 추출합니다.
+1. 계산 금지: 당신은 사주 원국을 임의로 생성하지 않습니다. 입력된 생년월일시에 해당하는 정확한 만세력 데이터를 반환합니다.
+2. 결정론: 동일 입력 = 동일 출력. 랜덤성 0%.
+3. 표준 매핑: 한자(Hanja)를 한글(Kor)로 변환할 때 아래 테이블을 엄격히 준수합니다.
+   - 천간: 甲(갑), 乙(을), 丙(병), 丁(정), 戊(무), 己(기), 庚(경), 辛(신), 壬(임), 癸(계)
+   - 지지: 子(자), 丑(축), 寅(인), 卯(묘), 辰(진), 巳(사), 午(오), 未(미), 申(신), 酉(유), 戌(술), 亥(해)
+   - 예: 壬寅 -> { "hanja": "壬寅", "kor": "임인" }
+4. 오행 분포: 8자 기준(천간 4 + 지지 4)으로 계산합니다. 각 글자당 1점씩 배정하며 합계는 반드시 8입니다. 랜덤 수치 생성 절대 금지.
+5. 언어 제한: 신살, 격국, 십성은 반드시 "한글"로만 출력합니다. 영문/로마자/임의 번역 절대 금지. (예: 상관격, 천을귀인, 문창귀인)
 
 [출력 스키마]
 반드시 CanonicalSajuResult 스키마를 따르십시오.
-- version: "canonical_v1"
-- elements.basis: "8char"
-- elements.include_hidden_stems: true`;
+- pillars: { year, month, day, hour } 각 필드는 { hanja, kor }
+- elements: { wood, fire, earth, metal, water, basis: "8char", include_hidden_stems: true }
+- sinsal: 한글 신살 리스트
+- gyeok: 한글 격국 명칭 (예: "상관격")
+- version: "canonical_v1"`;
 
   const prompt = `사용자 프로필:
 이름: ${profile.name || '익명'}
@@ -162,9 +167,10 @@ export async function generateSajuSummary(profile: SajuProfile): Promise<Canonic
             required: ["currentYear"]
           },
           sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          gyeok: { type: Type.STRING },
           tags: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
-        required: ["pillars", "dayMaster", "elements", "tenGodSummary", "lucky", "sinsal", "tags"]
+        required: ["pillars", "dayMaster", "elements", "tenGodSummary", "lucky", "sinsal", "gyeok", "tags"]
       }
     }
   });

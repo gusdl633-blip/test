@@ -40,6 +40,7 @@ const defaultData: CanonicalSajuResult = {
     currentYear: "병오(丙午)"
   },
   sinsal: ["년살", "장성살", "역마살", "문창귀인"],
+  gyeok: "상관격",
   tags: ["#상관강함", "#이동성높음", "#재성흐름"],
   generatedAt: new Date().toISOString(),
   version: "canonical_v1"
@@ -74,7 +75,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
     { label: '강약', value: data.tenGodSummary.strength },
     { label: '용신', value: data.tenGodSummary.yongsin },
     { label: '기신', value: data.tenGodSummary.gisins },
-    { label: '핵심격', value: data.tenGodSummary.core_gyeok },
+    { label: '핵심격', value: data.gyeok },
     { label: '2026운기', value: data.lucky.currentYear },
   ].filter(kpi => kpi.value);
 
