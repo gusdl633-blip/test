@@ -4,7 +4,7 @@ import ResultCard from './components/ResultCard';
 import ChatInterface from './components/ChatInterface';
 import CategoryCard from './components/ui/CategoryCard';
 import SajuSummaryHeader from './components/SajuSummaryHeader';
-import { SajuProfile, SajuReading, CanonicalSajuResult, CATEGORIES, generateSajuReading, generateSajuSummary } from './services/geminiService';
+import { SajuProfile, UnifiedSajuResult, CATEGORIES, generateSajuReading, generateUnifiedSaju } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from 'lucide-react';
 
@@ -13,10 +13,11 @@ type View = 'onboarding' | 'dashboard' | 'result' | 'chat';
 export default function App() {
   const [view, setView] = useState<View>('onboarding');
   const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [summary, setSummary] = useState<CanonicalSajuResult | null>(null);
+  const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
-  const [reading, setReading] = useState<SajuReading | null>(null);
+  const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string>(() => Math.random().toString(36).substring(7));
 
   // Load profile from local storage on mount
   useEffect(() => {
@@ -44,13 +45,15 @@ export default function App() {
   }, []);
 
   const fetchSummary = async (p: SajuProfile) => {
+    const requestId = Math.random().toString(36).substring(7);
     const profileKey = `${p.birthDate}|${p.birthTime || '00:00'}|${p.calendarType}|${p.location || 'none'}|${p.gender}`;
     const cached = localStorage.getItem(`saju_cache_${profileKey}`);
     
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed.version === 'canonical_v1' && parsed.profileKey === profileKey) {
+        // We still use cache if it exists, but we might need to re-fetch if schema changed
+        if (parsed.session_id && parsed.pillar) {
           setSummary(parsed);
           return;
         }
@@ -60,7 +63,7 @@ export default function App() {
     }
 
     try {
-      const data = await generateSajuSummary(p);
+      const data = await generateUnifiedSaju(p, sessionId, requestId);
       setSummary(data);
       localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
     } catch (e) {
@@ -78,13 +81,14 @@ export default function App() {
 
   const handleCategorySelect = async (categoryId: string) => {
     if (!profile) return;
+    const requestId = Math.random().toString(36).substring(7);
     setCurrentCategory(categoryId);
     setIsLoading(true);
     setView('result');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
     try {
-      const result = await generateSajuReading(profile, categoryId);
+      const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
       setReading(result);
     } catch (e) {
       console.error(e);
@@ -105,6 +109,7 @@ export default function App() {
       setProfile(null);
       setSummary(null);
       setReading(null);
+      setSessionId(Math.random().toString(36).substring(7));
       
       // Redirect to setup with history replace
       window.location.hash = '#setup';
@@ -260,7 +265,7 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="container mx-auto px-6 py-4"
             >
-              <ChatInterface profile={profile} />
+              <ChatInterface profile={profile} sessionId={sessionId} />
             </motion.div>
           )}
         </AnimatePresence>

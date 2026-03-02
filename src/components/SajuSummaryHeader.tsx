@@ -1,49 +1,43 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { User, Calendar, Zap, Info } from 'lucide-react';
-import { CanonicalSajuResult } from '../services/geminiService';
+import { UnifiedSajuResult } from '../services/geminiService';
 
 interface Props {
-  data?: CanonicalSajuResult;
+  data?: UnifiedSajuResult;
 }
 
-const defaultData: CanonicalSajuResult = {
-  profileKey: "default",
-  input: {
-    birth: "1993-03-22 13:00",
-    calendarType: "solar",
-    gender: "male"
+const defaultData: UnifiedSajuResult = {
+  session_id: "default",
+  request_id: "default",
+  profile: {
+    name: "이주현",
+    birth: "1993-03-22",
+    calendar: "solar",
+    time: "13:00"
   },
-  pillars: {
-    hour: { hanja: "丙午", kor: "병오" },
-    day: { hanja: "壬寅", kor: "임인" },
-    month: { hanja: "乙卯", kor: "을묘" },
-    year: { hanja: "癸酉", kor: "계유" }
+  pillar: {
+    hour: "병오",
+    day: "임인",
+    month: "을묘",
+    year: "계유"
   },
-  dayMaster: { hanja: "壬", kor: "임", element: "water" },
   elements: {
     wood: 3,
     fire: 2,
     earth: 0,
     metal: 1,
     water: 2,
-    basis: "8char",
-    include_hidden_stems: true
+    basis: "8char"
   },
-  tenGodSummary: {
-    strength: "중화",
-    yongsin: "금(金)",
-    gisins: "목(木)",
-    core_gyeok: "상관격"
-  },
-  lucky: {
-    currentYear: "병오(丙午)"
-  },
-  sinsal: ["년살", "장성살", "역마살", "문창귀인"],
-  gyeok: "상관격",
   tags: ["#상관강함", "#이동성높음", "#재성흐름"],
-  generatedAt: new Date().toISOString(),
-  version: "canonical_v1"
+  sinsal: ["년살", "장성살", "역마살", "문창귀인"],
+  summary: {
+    tone: "entp_shaman_female_30s",
+    one_liner: "당신은 생각보다 차갑다. 근데 그게 문제는 아니야.",
+    core_points: ["사람이 아니라 상황을 계산하는 타입", "방향으로 움직이는 에너지가 강함"]
+  },
+  chat_seed_questions: ["내년 연애운은 어때요?", "지금 이직해도 될까요?"]
 };
 
 const elementColors: Record<string, string> = {
@@ -71,13 +65,11 @@ const pillarLabels = [
 
 export default function SajuSummaryHeader({ data = defaultData }: Props) {
   const kpis = [
-    { label: '일간', value: `${data.dayMaster.kor}(${data.dayMaster.hanja})` },
-    { label: '강약', value: data.tenGodSummary.strength },
-    { label: '용신', value: data.tenGodSummary.yongsin },
-    { label: '기신', value: data.tenGodSummary.gisins },
-    { label: '핵심격', value: data.gyeok },
-    { label: '2026운기', value: data.lucky.currentYear },
-  ].filter(kpi => kpi.value);
+    { label: '일간', value: data.pillar.day.substring(0, 1) + '수' }, // Simplified for UI
+    { label: '톤', value: "ENTP 무당" },
+    { label: '세션', value: data.session_id.substring(0, 4) },
+    { label: '요청', value: data.request_id.substring(0, 4) },
+  ];
 
   return (
     <div className="sticky top-0 z-40 w-full mb-8">
@@ -96,17 +88,17 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg md:text-xl font-bold text-white">사주 원국</h2>
+                <h2 className="text-lg md:text-xl font-bold text-white">{data.profile.name || '사주 원국'}</h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-sub">
-                  {data.input.gender === 'male' ? '乾命' : '坤命'}
+                  {data.profile.calendar === 'solar' ? '陽' : '陰'}
                 </span>
               </div>
               <div className="flex flex-col text-[11px] text-text-sub gap-1">
                 <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> {data.input.birth}
+                  <Calendar className="w-3 h-3" /> {data.profile.birth} {data.profile.time}
                 </div>
                 <div className="flex items-center gap-1 text-neon-primary font-bold">
-                  <Zap className="w-3 h-3" /> {data.dayMaster.kor} 일간
+                  <Zap className="w-3 h-3" /> {data.pillar.day} 일주
                 </div>
               </div>
             </div>
@@ -118,10 +110,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
                 <span className="text-[9px] text-text-sub uppercase tracking-tighter opacity-60">{label}</span>
                 <div className="w-14 h-14 md:w-16 md:h-16 glass-panel flex flex-col items-center justify-center border-white/10 group hover:border-neon-secondary/30 transition-colors">
                   <span className="text-base md:text-lg font-bold text-white tracking-widest">
-                    {(data.pillars as any)[key].kor}
-                  </span>
-                  <span className="text-[10px] text-text-sub opacity-40 font-serif">
-                    {(data.pillars as any)[key].hanja}
+                    {(data.pillar as any)[key]}
                   </span>
                 </div>
               </div>
@@ -131,7 +120,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
 
         {/* Row B: KPI Bar */}
         <div className="flex flex-wrap gap-3">
-          {kpis.slice(0, 6).map((kpi, i) => (
+          {kpis.map((kpi, i) => (
             <div 
               key={i}
               className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3 min-w-[100px] flex-1 md:flex-none"
@@ -207,7 +196,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
         <div className="flex justify-end items-center gap-2 opacity-30 hover:opacity-100 transition-opacity">
           <Info className="w-3 h-3 text-text-sub" />
           <span className="text-[9px] text-text-sub uppercase tracking-tighter">
-            Data Engine: {data.version} | Generated: {new Date(data.generatedAt).toLocaleString()}
+            Session: {data.session_id} | Request: {data.request_id}
           </span>
         </div>
       </motion.div>

@@ -12,16 +12,6 @@ export interface SajuProfile {
   location?: string;
 }
 
-export interface SajuReading {
-  conclusion: string;
-  reasoning: string[];
-  goodSigns: string[];
-  badSigns: string[];
-  actionsToTake: string[];
-  actionsToAvoid: string[];
-  followUpQuestions: string[];
-}
-
 export const CATEGORIES = [
   { id: 'yearly', label: '올해/이번달 운세', icon: '📅' },
   { id: 'romance', label: '연애운', icon: '❤️' },
@@ -35,69 +25,59 @@ export const CATEGORIES = [
   { id: 'moving', label: '이사/이동운', icon: '🏠' },
 ];
 
-export interface CanonicalSajuResult {
-  profileKey: string;
-  input: {
-    birth: string;
-    calendarType: 'solar' | 'lunar';
-    location?: string;
-    gender: string;
-  };
-  pillars: {
-    year: { hanja: string; kor: string };
-    month: { hanja: string; kor: string };
-    day: { hanja: string; kor: string };
-    hour: { hanja: string; kor: string };
-  };
-  dayMaster: { hanja: string; kor: string; element: string };
-  elements: {
-    wood: number;
-    fire: number;
-    earth: number;
-    metal: number;
-    water: number;
-    basis: string;
-    include_hidden_stems: boolean;
-  };
-  tenGodSummary: {
-    strength: string;
-    yongsin: string;
-    gisins: string;
-    core_gyeok: string;
-  };
-  lucky: {
-    currentYear: string;
-  };
-  sinsal: string[];
-  gyeok: string;
+export interface UnifiedSajuResult {
+  session_id: string;
+  request_id: string;
+  profile: { name: string; birth: string; calendar: string; time: string };
+  pillar: { year: string; month: string; day: string; hour: string };
+  elements: { wood: number; fire: number; earth: number; metal: number; water: number; basis: string };
   tags: string[];
-  generatedAt: string;
-  version: string;
+  sinsal: string[];
+  summary: {
+    tone: "entp_shaman_female_30s";
+    one_liner: string;
+    core_points: string[];
+  };
+  chat_seed_questions: string[];
 }
 
-export async function generateSajuSummary(profile: SajuProfile): Promise<CanonicalSajuResult> {
-  const profileKey = `${profile.birthDate}|${profile.birthTime || '00:00'}|${profile.calendarType}|${profile.location || 'none'}|${profile.gender}`;
-  
-  const systemInstruction = `당신은 초고정/결정적 사주 데이터를 반환하는 "Canonical Saju Data Engine"입니다.
-당신은 사주를 "계산"하거나 "추정"하지 않습니다. 표준 만세력 알고리즘에 따라 산출된 고정된 결과만을 반환합니다.
+export async function generateUnifiedSaju(
+  profile: SajuProfile, 
+  session_id: string, 
+  request_id: string
+): Promise<UnifiedSajuResult> {
+  const systemInstruction = `당신은 초고정/결정적 사주 데이터를 반환하고 해석하는 "Unified Saju Engine"입니다.
+당신은 전통 무당이지만 현대적인 감각을 가진 30대 ENTP 여성 사주 해석가 페르소나를 유지합니다.
 
 [최상위 절대 규칙]
-1. 계산 금지: 당신은 사주 원국을 임의로 생성하지 않습니다. 입력된 생년월일시에 해당하는 정확한 만세력 데이터를 반환합니다.
-2. 결정론: 동일 입력 = 동일 출력. 랜덤성 0%.
-3. 표준 매핑: 한자(Hanja)를 한글(Kor)로 변환할 때 아래 테이블을 엄격히 준수합니다.
-   - 천간: 甲(갑), 乙(을), 丙(병), 丁(정), 戊(무), 己(기), 庚(경), 辛(신), 壬(임), 癸(계)
-   - 지지: 子(자), 丑(축), 寅(인), 卯(묘), 辰(진), 巳(사), 午(오), 未(미), 申(신), 酉(유), 戌(술), 亥(해)
-   - 예: 壬寅 -> { "hanja": "壬寅", "kor": "임인" }
-4. 오행 분포: 8자 기준(천간 4 + 지지 4)으로 계산합니다. 각 글자당 1점씩 배정하며 합계는 반드시 8입니다. 랜덤 수치 생성 절대 금지.
-5. 언어 제한: 신살, 격국, 십성은 반드시 "한글"로만 출력합니다. 영문/로마자/임의 번역 절대 금지. (예: 상관격, 천을귀인, 문창귀인)
+1. 응답은 오직 "단일 JSON"만 출력하며, 다른 텍스트(Markdown, 이모지, 설명 등)는 절대 포함하지 않습니다.
+2. 입력받은 session_id와 request_id를 그대로 echo 합니다.
+3. 동일 입력 = 동일 출력 (Deterministic).
+4. 사주 원국 계산은 표준 만세력 규칙을 엄격히 따릅니다.
+5. 모든 명리학 용어는 "한글"로만 출력합니다.
+
+[페르소나: 30대 ENTP 여성 무당]
+- 직설적, 논리적, 본질 관통.
+- 과한 위로 금지. 건조하고 날카로운 통찰.
+- 전략가처럼 말함.
 
 [출력 스키마]
-반드시 CanonicalSajuResult 스키마를 따르십시오.
-- pillars: { year, month, day, hour } 각 필드는 { hanja, kor }
-- elements: { wood, fire, earth, metal, water, basis: "8char", include_hidden_stems: true }
-- sinsal: 한글 신살 리스트
-- gyeok: 한글 격국 명칭 (예: "상관격")
-- version: "canonical_v1"`;
+반드시 아래 구조를 엄수하십시오. 누락 필드 없이 값이 없으면 빈 문자열/배열로 채웁니다.
+{
+  "session_id": "${session_id}",
+  "request_id": "${request_id}",
+  "profile": { "name": "", "birth": "", "calendar": "", "time": "" },
+  "pillar": { "year":"", "month":"", "day":"", "hour":"" },
+  "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0,"basis":"8char" },
+  "tags": [],
+  "sinsal": [],
+  "summary": {
+    "tone":"entp_shaman_female_30s",
+    "one_liner":"",
+    "core_points":[]
+  },
+  "chat_seed_questions":[]
+}`;
 
   const prompt = `사용자 프로필:
 이름: ${profile.name || '익명'}
@@ -106,7 +86,7 @@ export async function generateSajuSummary(profile: SajuProfile): Promise<Canonic
 출생시간: ${profile.timeKnown ? profile.birthTime : '모름'}
 출생지: ${profile.location || '미지정'}
 
-위 정보를 바탕으로 CanonicalSajuResult JSON 객체를 생성하라.`;
+위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -117,24 +97,27 @@ export async function generateSajuSummary(profile: SajuProfile): Promise<Canonic
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          pillars: {
+          session_id: { type: Type.STRING },
+          request_id: { type: Type.STRING },
+          profile: {
             type: Type.OBJECT,
             properties: {
-              year: { type: Type.OBJECT, properties: { hanja: { type: Type.STRING }, kor: { type: Type.STRING } }, required: ["hanja", "kor"] },
-              month: { type: Type.OBJECT, properties: { hanja: { type: Type.STRING }, kor: { type: Type.STRING } }, required: ["hanja", "kor"] },
-              day: { type: Type.OBJECT, properties: { hanja: { type: Type.STRING }, kor: { type: Type.STRING } }, required: ["hanja", "kor"] },
-              hour: { type: Type.OBJECT, properties: { hanja: { type: Type.STRING }, kor: { type: Type.STRING } }, required: ["hanja", "kor"] },
+              name: { type: Type.STRING },
+              birth: { type: Type.STRING },
+              calendar: { type: Type.STRING },
+              time: { type: Type.STRING }
+            },
+            required: ["name", "birth", "calendar", "time"]
+          },
+          pillar: {
+            type: Type.OBJECT,
+            properties: {
+              year: { type: Type.STRING },
+              month: { type: Type.STRING },
+              day: { type: Type.STRING },
+              hour: { type: Type.STRING }
             },
             required: ["year", "month", "day", "hour"]
-          },
-          dayMaster: { 
-            type: Type.OBJECT, 
-            properties: { 
-              hanja: { type: Type.STRING }, 
-              kor: { type: Type.STRING },
-              element: { type: Type.STRING }
-            },
-            required: ["hanja", "kor", "element"]
           },
           elements: {
             type: Type.OBJECT,
@@ -144,81 +127,74 @@ export async function generateSajuSummary(profile: SajuProfile): Promise<Canonic
               earth: { type: Type.NUMBER },
               metal: { type: Type.NUMBER },
               water: { type: Type.NUMBER },
-              basis: { type: Type.STRING },
-              include_hidden_stems: { type: Type.BOOLEAN },
+              basis: { type: Type.STRING }
             },
-            required: ["wood", "fire", "earth", "metal", "water", "basis", "include_hidden_stems"]
+            required: ["wood", "fire", "earth", "metal", "water", "basis"]
           },
-          tenGodSummary: {
-            type: Type.OBJECT,
-            properties: {
-              strength: { type: Type.STRING },
-              yongsin: { type: Type.STRING },
-              gisins: { type: Type.STRING },
-              core_gyeok: { type: Type.STRING },
-            },
-            required: ["strength", "yongsin", "gisins", "core_gyeok"]
-          },
-          lucky: {
-            type: Type.OBJECT,
-            properties: {
-              currentYear: { type: Type.STRING },
-            },
-            required: ["currentYear"]
-          },
-          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
-          gyeok: { type: Type.STRING },
           tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          summary: {
+            type: Type.OBJECT,
+            properties: {
+              tone: { type: Type.STRING },
+              one_liner: { type: Type.STRING },
+              core_points: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["tone", "one_liner", "core_points"]
+          },
+          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
-        required: ["pillars", "dayMaster", "elements", "tenGodSummary", "lucky", "sinsal", "gyeok", "tags"]
+        required: ["session_id", "request_id", "profile", "pillar", "elements", "tags", "sinsal", "summary", "chat_seed_questions"]
       }
     }
   });
 
-  const result = JSON.parse(response.text || "{}");
-  return {
-    ...result,
-    profileKey,
-    input: {
-      birth: `${profile.birthDate} ${profile.birthTime || ''}`,
-      calendarType: profile.calendarType,
-      location: profile.location,
-      gender: profile.gender
-    },
-    generatedAt: new Date().toISOString(),
-    version: "canonical_v1"
-  };
+  return JSON.parse(response.text || "{}");
 }
 
-export async function generateSajuReading(profile: SajuProfile, category: string): Promise<SajuReading> {
+export async function generateSajuReading(
+  profile: SajuProfile, 
+  category: string,
+  session_id: string,
+  request_id: string
+): Promise<UnifiedSajuResult> {
   const categoryLabel = CATEGORIES.find(c => c.id === category)?.label || category;
   
-  const systemInstruction = `당신은 전통 무당이지만 현대적인 감각을 가진 30대 ENTP 여성 사주 해석가입니다.
-현재 시점은 2026년(병오년)입니다.
+  const systemInstruction = `당신은 초고정/결정적 사주 데이터를 반환하고 해석하는 "Unified Saju Engine"입니다.
+당신은 전통 무당이지만 현대적인 감각을 가진 30대 ENTP 여성 사주 해석가 페르소나를 유지합니다.
 
-[성격 및 톤]
-- 직설적, 논리적, 돌려 말하지 않음.
-- 과한 위로 금지. 가끔 피식 웃는 듯한 건조하고 생동감 있는 말투.
-- 상투적 문구("좋은 기운", "행운") 절대 금지.
-- 교과서식 설명, 뻔한 멘트, 무속 미신식 겁주기, 확률적 말장난 금지.
+[최상위 절대 규칙]
+1. 응답은 오직 "단일 JSON"만 출력하며, 다른 텍스트(Markdown, 이모지, 설명 등)는 절대 포함하지 않습니다.
+2. 입력받은 session_id와 request_id를 그대로 echo 합니다.
+3. 동일 입력 = 동일 출력 (Deterministic).
+4. 사주 원국 계산은 표준 만세력 규칙을 엄격히 따릅니다.
+5. 모든 명리학 용어는 "한글"로만 출력합니다.
 
-[해석 방식]
-1. 본질을 찌른다.
-2. 성격 구조를 구조적으로 설명한다.
-3. 장점/위험요소를 동시에 말한다.
-4. 현실 조언은 전략처럼 말한다.
-5. 감정 과잉 없이 건조하게 툭 던진다.
+[페르소나: 30대 ENTP 여성 무당]
+- 직설적, 논리적, 본질 관통.
+- 과한 위로 금지. 건조하고 날카로운 통찰.
+- 전략가처럼 말함.
 
-[출력 구조 JSON]
-- conclusion: [1] 핵심 진단 한 줄 (도발적이고 날카로운 본질 관통)
-- reasoning: [2] 구조 설명 및 [3] 지금 시점의 흐름 (2~3문장 단위로 끊어서, 총 3~5개 항목)
-- goodSigns: 지금 당신에게 유리하게 작용하는 흐름 (3개)
-- badSigns: 지금 당신을 발목 잡는 위험 요소 (3개)
-- actionsToTake: [4] 전략적 조언 (실질적인 행동 지침, 3개)
-- actionsToAvoid: 지금 절대 하지 말아야 할 짓 (3개)
-- followUpQuestions: [5] 상대가 스스로 생각하게 만드는 날카로운 질문 (3개)
+[해석 요청: ${categoryLabel}]
+해당 카테고리에 집중하여 해석을 수행하십시오.
 
-* 출생시간을 모르면(timeKnown: false), "시간 정보가 없어 일부 해석은 반쪽짜리다."라는 문장을 reasoning 첫 번째 항목에 넣으세요.`;
+[출력 스키마]
+반드시 아래 구조를 엄수하십시오. 누락 필드 없이 값이 없으면 빈 문자열/배열로 채웁니다.
+{
+  "session_id": "${session_id}",
+  "request_id": "${request_id}",
+  "profile": { "name": "", "birth": "", "calendar": "", "time": "" },
+  "pillar": { "year":"", "month":"", "day":"", "hour":"" },
+  "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0,"basis":"8char" },
+  "tags": [],
+  "sinsal": [],
+  "summary": {
+    "tone":"entp_shaman_female_30s",
+    "one_liner":"",
+    "core_points":[]
+  },
+  "chat_seed_questions":[]
+}`;
 
   const prompt = `사용자 프로필:
 이름: ${profile.name || '익명'}
@@ -229,7 +205,7 @@ export async function generateSajuReading(profile: SajuProfile, category: string
 
 카테고리: ${categoryLabel}
 
-위 정보를 바탕으로 사주를 단정적으로 풀이하라.`;
+위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -240,39 +216,54 @@ export async function generateSajuReading(profile: SajuProfile, category: string
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          conclusion: { type: Type.STRING, description: "🔮 운세 한 줄 결론" },
-          reasoning: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "⚡ 지금 흐름 해석 (단정적 3~5줄)"
+          session_id: { type: Type.STRING },
+          request_id: { type: Type.STRING },
+          profile: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              birth: { type: Type.STRING },
+              calendar: { type: Type.STRING },
+              time: { type: Type.STRING }
+            },
+            required: ["name", "birth", "calendar", "time"]
           },
-          goodSigns: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "🔥 반드시 해야 할 행동"
+          pillar: {
+            type: Type.OBJECT,
+            properties: {
+              year: { type: Type.STRING },
+              month: { type: Type.STRING },
+              day: { type: Type.STRING },
+              hour: { type: Type.STRING }
+            },
+            required: ["year", "month", "day", "hour"]
           },
-          badSigns: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "🚫 지금 하면 꼬이는 행동"
+          elements: {
+            type: Type.OBJECT,
+            properties: {
+              wood: { type: Type.NUMBER },
+              fire: { type: Type.NUMBER },
+              earth: { type: Type.NUMBER },
+              metal: { type: Type.NUMBER },
+              water: { type: Type.NUMBER },
+              basis: { type: Type.STRING }
+            },
+            required: ["wood", "fire", "earth", "metal", "water", "basis"]
           },
-          actionsToTake: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "지금 당장 액션"
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          summary: {
+            type: Type.OBJECT,
+            properties: {
+              tone: { type: Type.STRING },
+              one_liner: { type: Type.STRING },
+              core_points: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["tone", "one_liner", "core_points"]
           },
-          actionsToAvoid: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "피해야 할 행동"
-          },
-          followUpQuestions: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "추가 질문 추천"
-          }
+          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
-        required: ["conclusion", "reasoning", "goodSigns", "badSigns", "actionsToTake", "actionsToAvoid", "followUpQuestions"]
+        required: ["session_id", "request_id", "profile", "pillar", "elements", "tags", "sinsal", "summary", "chat_seed_questions"]
       }
     }
   });
@@ -280,38 +271,61 @@ export async function generateSajuReading(profile: SajuProfile, category: string
   return JSON.parse(response.text || "{}");
 }
 
-export async function chatWithSaju(profile: SajuProfile, history: {role: string, message: string}[], userMessage: string) {
+export async function chatWithSaju(
+  profile: SajuProfile, 
+  history: any[], 
+  userMessage: string,
+  session_id: string,
+  request_id: string
+): Promise<UnifiedSajuResult> {
   const systemInstruction = `당신은 전통 무당이지만 현대적인 감각을 가진 30대 ENTP 여성 사주 상담가입니다.
-현재 시점은 2026년(병오년)입니다.
+당신은 사용자의 사주 정보를 바탕으로 1:1 상담을 진행합니다.
+
+[최상위 절대 규칙]
+1. 응답은 오직 "단일 JSON"만 출력하며, 다른 텍스트는 절대 포함하지 않습니다.
+2. 입력받은 session_id와 request_id를 그대로 echo 합니다.
+3. 당신의 답변(상담 메시지)은 "summary.one_liner" 필드에 넣으십시오.
+4. 추가적인 통찰이나 조언은 "summary.core_points"에 넣으십시오.
+5. 모든 명리학 용어는 "한글"로만 출력합니다.
+
+[페르소나: 30대 ENTP 여성 무당]
+- 직설적, 논리적, 본질 관통.
+- 과한 위로 금지. 건조하고 날카로운 통찰.
+- 전략가처럼 말함.
 
 [상담 규칙]
-1. 직설적이고 논리적이며, 사용자의 말 속 숨은 패턴을 집어내 본질을 찌르세요.
-2. 과한 위로 대신 건조하고 날카로운 통찰을 툭 던지듯 말합니다.
-3. ENTP 특유의 도발적인 유머를 섞되, 말 길게 늘이지 말고 2~3문장 단위로 끊으세요.
-4. 상담자가 아니라 인생의 전략가처럼 행동하세요.
-5. 출생시간을 모르면(timeKnown: false), "시간 정보가 없어 일부 해석은 반쪽짜리다."라고 박고 시작하세요.
-6. 답변마다 반드시 최소 1개의 날카로운 통찰 포인트를 포함하세요.
-7. 자연스러운 한국어 문장으로만 답변하세요. JSON 출력 금지.
+1. 상대의 질문 이면에 숨겨진 패턴과 심리를 짚어냅니다.
+2. 답변은 간결하고 명확하게 제공합니다.
 
-사용자 사주 정보:
-${JSON.stringify(profile)}`;
+[출력 스키마]
+반드시 아래 구조를 엄수하십시오.
+{
+  "session_id": "${session_id}",
+  "request_id": "${request_id}",
+  "profile": { "name": "", "birth": "", "calendar": "", "time": "" },
+  "pillar": { "year":"", "month":"", "day":"", "hour":"" },
+  "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0,"basis":"8char" },
+  "tags": [],
+  "sinsal": [],
+  "summary": {
+    "tone":"entp_shaman_female_30s",
+    "one_liner":"(여기에 상담 답변을 넣으세요)",
+    "core_points":[]
+  },
+  "chat_seed_questions":[]
+}`;
 
   const chat = ai.chats.create({
     model: "gemini-3-flash-preview",
     config: {
-      systemInstruction: `${systemInstruction}\n\n사용자 사주 정보:\n${JSON.stringify(profile)}`
+      systemInstruction,
+      responseMimeType: "application/json"
     }
   });
 
-  // Reconstruct history
-  // Note: sendMessage doesn't take history directly in this SDK version, 
-  // we might need to send them sequentially or just the last few as context in the prompt if needed.
-  // But the SDK's chat object maintains state if we reuse it. 
-  // For stateless API calls, we include history in the prompt.
-  
   const historyContext = history.map(h => `${h.role === 'user' ? '사용자' : '상담가'}: ${h.message}`).join('\n');
-  const prompt = `이전 대화 내역:\n${historyContext}\n\n사용자 질문: ${userMessage}`;
+  const prompt = `사용자 사주: ${JSON.stringify(profile)}\n이전 대화:\n${historyContext}\n\n사용자 질문: ${userMessage}\n\n위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   const response = await chat.sendMessage({ message: prompt });
-  return response.text;
+  return JSON.parse(response.text || "{}");
 }

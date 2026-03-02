@@ -1,12 +1,12 @@
 import React from 'react';
-import { SajuReading } from '../services/geminiService';
+import { UnifiedSajuResult } from '../services/geminiService';
 import { motion } from 'motion/react';
-import { CheckCircle2, AlertTriangle, ArrowRight, XCircle, Sparkles } from 'lucide-react';
+import { Sparkles, Info, MessageSquare } from 'lucide-react';
 import NeonCard from './ui/NeonCard';
 import GlowButton from './ui/GlowButton';
 
 interface Props {
-  reading: SajuReading;
+  reading: UnifiedSajuResult;
   categoryLabel: string;
   onConsult: () => void;
 }
@@ -28,7 +28,7 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           {categoryLabel}
         </motion.div>
         <h2 className="text-4xl md:text-5xl font-bold leading-tight tracking-tight text-white">
-          <span className="text-accent">"</span>{reading.conclusion}<span className="text-accent">"</span>
+          <span className="text-accent">"</span>{reading.summary.one_liner}<span className="text-accent">"</span>
         </h2>
       </div>
 
@@ -36,89 +36,62 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
         <section>
           <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
             <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
-            핵심 근거
+            핵심 분석
           </h3>
           <div className="grid gap-4">
-            {reading.reasoning.map((item, i) => (
+            {reading.summary.core_points.map((item, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="p-4 bg-white/5 border border-white/5 rounded-xl text-lg text-text-main"
+                className="p-6 bg-white/5 border border-white/5 rounded-2xl text-lg text-text-main leading-relaxed"
               >
+                <span className="text-neon-secondary mr-3 font-mono">0{i + 1}</span>
                 {item}
               </motion.div>
             ))}
           </div>
         </section>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <section className="bg-neon-primary/5 p-6 rounded-2xl border border-neon-primary/20 shadow-[0_0_20px_rgba(0,255,156,0.05)]">
-            <h3 className="flex items-center text-sm font-bold text-neon-primary mb-4">
-              <CheckCircle2 className="w-4 h-4 mr-2" /> 좋은 흐름
-            </h3>
-            <ul className="space-y-3 text-sm text-text-main/90">
-              {reading.goodSigns.map((item, i) => (
-                <li key={i} className="flex items-start">
-                  <span className="text-neon-primary mr-2">•</span>
-                  {item}
-                </li>
+        <div className="grid md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">분석 태그</span>
+            <div className="flex flex-wrap gap-2">
+              {reading.tags.map((tag, i) => (
+                <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-text-sub">
+                  {tag}
+                </span>
               ))}
-            </ul>
-          </section>
-
-          <section className="bg-accent/5 p-6 rounded-2xl border border-accent/20 shadow-[0_0_20px_rgba(255,138,61,0.05)]">
-            <h3 className="flex items-center text-sm font-bold text-accent mb-4">
-              <AlertTriangle className="w-4 h-4 mr-2" /> 위험 신호
-            </h3>
-            <ul className="space-y-3 text-sm text-text-main/90">
-              {reading.badSigns.map((item, i) => (
-                <li key={i} className="flex items-start">
-                  <span className="text-accent mr-2">•</span>
-                  {item}
-                </li>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">신살/특성</span>
+            <div className="flex flex-wrap gap-2">
+              {reading.sinsal.map((s, i) => (
+                <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-neon-primary/10 border border-neon-primary/20 text-neon-primary">
+                  {s}
+                </span>
               ))}
-            </ul>
-          </section>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-10">
-          <section className="space-y-4">
-            <h3 className="text-sm font-bold text-neon-primary/80 tracking-wider">지금 당장 액션</h3>
-            <ul className="space-y-3">
-              {reading.actionsToTake.map((item, i) => (
-                <li key={i} className="flex items-start text-sm text-text-main/80">
-                  <ArrowRight className="w-4 h-4 mr-3 mt-0.5 text-neon-primary" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="space-y-4">
-            <h3 className="text-sm font-bold text-accent/80 tracking-wider">피해야 할 행동</h3>
-            <ul className="space-y-3">
-              {reading.actionsToAvoid.map((item, i) => (
-                <li key={i} className="flex items-start text-sm text-text-main/80">
-                  <XCircle className="w-4 h-4 mr-3 mt-0.5 text-accent" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+            </div>
+          </div>
         </div>
       </NeonCard>
 
       <NeonCard className="bg-bg-end/80 border-neon-secondary/30" glowColor="secondary">
         <div className="space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold text-white">더 깊은 상담이 필요하신가요?</h3>
-            <p className="text-sm text-text-sub">당신의 사주를 바탕으로 1:1 맞춤 상담을 이어갈 수 있습니다.</p>
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white">더 깊은 상담이 필요하신가요?</h3>
+              <p className="text-sm text-text-sub">당신의 사주를 바탕으로 1:1 맞춤 상담을 이어갈 수 있습니다.</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-neon-secondary/10 border border-neon-secondary/20 flex items-center justify-center">
+              <MessageSquare className="w-6 h-6 text-neon-secondary" />
+            </div>
           </div>
           
           <div className="flex flex-wrap gap-2">
-            {reading.followUpQuestions.map((q, i) => (
+            {reading.chat_seed_questions.map((q, i) => (
               <button 
                 key={i} 
                 onClick={onConsult}
@@ -139,6 +112,15 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           </GlowButton>
         </div>
       </NeonCard>
+
+      <div className="flex justify-center items-center gap-4 opacity-20">
+        <div className="flex items-center gap-1.5">
+          <Info className="w-3 h-3" />
+          <span className="text-[9px] uppercase tracking-tighter">Session: {reading.session_id}</span>
+        </div>
+        <div className="w-1 h-1 bg-white/50 rounded-full" />
+        <span className="text-[9px] uppercase tracking-tighter">Request: {reading.request_id}</span>
+      </div>
     </motion.div>
   );
 }

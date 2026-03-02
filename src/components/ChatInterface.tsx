@@ -13,10 +13,11 @@ interface Message {
 
 interface Props {
   profile: SajuProfile;
+  sessionId: string;
   initialMessage?: string;
 }
 
-export default function ChatInterface({ profile, initialMessage }: Props) {
+export default function ChatInterface({ profile, sessionId, initialMessage }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,8 +43,12 @@ export default function ChatInterface({ profile, initialMessage }: Props) {
     setIsLoading(true);
 
     try {
-      const response = await chatWithSaju(profile, messages, text);
-      const botMsg: Message = { role: 'assistant', message: response || '죄송합니다. 답변을 생성하지 못했습니다.' };
+      const requestId = Math.random().toString(36).substring(7);
+      const response = await chatWithSaju(profile, messages, text, sessionId, requestId);
+      const botMsg: Message = { 
+        role: 'assistant', 
+        message: response.summary.one_liner || '죄송합니다. 답변을 생성하지 못했습니다.' 
+      };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
       console.error(error);
