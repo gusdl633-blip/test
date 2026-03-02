@@ -4,7 +4,7 @@ import ResultCard from './components/ResultCard';
 import ChatInterface from './components/ChatInterface';
 import CategoryCard from './components/ui/CategoryCard';
 import SajuSummaryHeader from './components/SajuSummaryHeader';
-import { SajuProfile, SajuReading, SajuSummary, CATEGORIES, generateSajuReading, generateSajuSummary } from './services/geminiService';
+import { SajuProfile, SajuReading, CanonicalSajuResult, CATEGORIES, generateSajuReading, generateSajuSummary } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from 'lucide-react';
 
@@ -13,26 +13,56 @@ type View = 'onboarding' | 'dashboard' | 'result' | 'chat';
 export default function App() {
   const [view, setView] = useState<View>('onboarding');
   const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [summary, setSummary] = useState<SajuSummary | null>(null);
+  const [summary, setSummary] = useState<CanonicalSajuResult | null>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   const [reading, setReading] = useState<SajuReading | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Load profile from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('saju_profile');
-    if (saved) {
-      const parsedProfile = JSON.parse(saved);
-      setProfile(parsedProfile);
-      setView('dashboard');
-      fetchSummary(parsedProfile);
-    }
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#setup') {
+        setView('onboarding');
+      } else {
+        const saved = localStorage.getItem('saju_profile');
+        if (saved) {
+          const parsedProfile = JSON.parse(saved);
+          setProfile(parsedProfile);
+          setView('dashboard');
+          fetchSummary(parsedProfile);
+        } else {
+          setView('onboarding');
+          window.location.hash = '#setup';
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const fetchSummary = async (p: SajuProfile) => {
+    const profileKey = `${p.birthDate}|${p.birthTime || '00:00'}|${p.calendarType}|${p.location || 'none'}|${p.gender}`;
+    const cached = localStorage.getItem(`saju_cache_${profileKey}`);
+    
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.version === 'canonical_v1' && parsed.profileKey === profileKey) {
+          setSummary(parsed);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse cached summary:', e);
+      }
+    }
+
     try {
       const data = await generateSajuSummary(p);
       setSummary(data);
+      localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
     } catch (e) {
       console.error('Failed to fetch summary:', e);
     }
@@ -41,6 +71,7 @@ export default function App() {
   const handleProfileSubmit = async (data: SajuProfile) => {
     setProfile(data);
     localStorage.setItem('saju_profile', JSON.stringify(data));
+    window.location.hash = '';
     setView('dashboard');
     fetchSummary(data);
   };
@@ -64,8 +95,20 @@ export default function App() {
 
   const resetProfile = () => {
     if (confirm('모든 정보와 대화 내역이 초기화됩니다. 계속하시겠습니까?')) {
-      localStorage.removeItem('saju_profile');
+      // Clear all saju related keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('saju_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
       setProfile(null);
+      setSummary(null);
+      setReading(null);
+      
+      // Redirect to setup with history replace
+      window.location.hash = '#setup';
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
       setView('onboarding');
     }
   };
@@ -81,7 +124,12 @@ export default function App() {
       <header className="p-6 flex justify-between items-center z-50">
         <div 
           className="flex items-center space-x-3 cursor-pointer group" 
-          onClick={() => profile && setView('dashboard')}
+          onClick={() => {
+            if (profile) {
+              window.location.hash = '';
+              setView('dashboard');
+            }
+          }}
         >
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center group-hover:border-neon-primary/50 transition-all shadow-[0_0_20px_rgba(0,255,156,0.1)]">
             <Sparkles className="w-6 h-6 text-neon-primary" />

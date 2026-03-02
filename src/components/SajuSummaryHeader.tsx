@@ -1,41 +1,48 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { User, Calendar, Zap } from 'lucide-react';
-import { SajuSummary } from '../services/geminiService';
+import { User, Calendar, Zap, Info } from 'lucide-react';
+import { CanonicalSajuResult } from '../services/geminiService';
 
 interface Props {
-  data?: SajuSummary;
+  data?: CanonicalSajuResult;
 }
 
-const defaultData: SajuSummary = {
-  profile: {
-    name: "이주현",
-    age: 34,
-    birth: "1993-03-22 13:00"
+const defaultData: CanonicalSajuResult = {
+  profileKey: "default",
+  input: {
+    birth: "1993-03-22 13:00",
+    calendarType: "solar",
+    gender: "male"
   },
-  saju: {
-    si: { ganji: "丙午", display: "병오" },
-    il: { ganji: "壬寅", display: "임인" },
-    wol: { ganji: "乙卯", display: "을묘" },
-    nyeon: { ganji: "癸酉", display: "계유" }
+  pillars: {
+    hour: { hanja: "丙午", kor: "병오" },
+    day: { hanja: "壬寅", kor: "임인" },
+    month: { hanja: "乙卯", kor: "을묘" },
+    year: { hanja: "癸酉", kor: "계유" }
   },
-  core: {
-    ilgans: "壬水",
-    strength: "중화",
-    yongsin: "금(金)",
-    gisins: "목(木)",
-    core_gyeok: "상관격",
-    current_year_luck: "병오(丙午)"
-  },
-  ohaeng: {
+  dayMaster: { hanja: "壬", kor: "임", element: "water" },
+  elements: {
     wood: 3,
     fire: 2,
     earth: 0,
     metal: 1,
-    water: 2
+    water: 2,
+    basis: "8char",
+    include_hidden_stems: true
   },
-  traits: ["#상관강함", "#이동성높음", "#재성흐름"],
-  sinsal: ["년살", "장성살", "역마살", "문창귀인"]
+  tenGodSummary: {
+    strength: "중화",
+    yongsin: "금(金)",
+    gisins: "목(木)",
+    core_gyeok: "상관격"
+  },
+  lucky: {
+    currentYear: "병오(丙午)"
+  },
+  sinsal: ["년살", "장성살", "역마살", "문창귀인"],
+  tags: ["#상관강함", "#이동성높음", "#재성흐름"],
+  generatedAt: new Date().toISOString(),
+  version: "canonical_v1"
 };
 
 const elementColors: Record<string, string> = {
@@ -55,20 +62,20 @@ const elementLabels: Record<string, string> = {
 };
 
 const pillarLabels = [
-  { key: 'si', label: '시주' },
-  { key: 'il', label: '일주' },
-  { key: 'wol', label: '월주' },
-  { key: 'nyeon', label: '년주' },
+  { key: 'hour', label: '시주' },
+  { key: 'day', label: '일주' },
+  { key: 'month', label: '월주' },
+  { key: 'year', label: '년주' },
 ];
 
 export default function SajuSummaryHeader({ data = defaultData }: Props) {
   const kpis = [
-    { label: '일간', value: data.core.ilgans },
-    { label: '강약', value: data.core.strength },
-    { label: '용신', value: data.core.yongsin },
-    { label: '기신', value: data.core.gisins },
-    { label: '핵심격', value: data.core.core_gyeok },
-    { label: '2026운기', value: data.core.current_year_luck },
+    { label: '일간', value: `${data.dayMaster.kor}(${data.dayMaster.hanja})` },
+    { label: '강약', value: data.tenGodSummary.strength },
+    { label: '용신', value: data.tenGodSummary.yongsin },
+    { label: '기신', value: data.tenGodSummary.gisins },
+    { label: '핵심격', value: data.tenGodSummary.core_gyeok },
+    { label: '2026운기', value: data.lucky.currentYear },
   ].filter(kpi => kpi.value);
 
   return (
@@ -88,17 +95,17 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg md:text-xl font-bold text-white">{data.profile.name}</h2>
+                <h2 className="text-lg md:text-xl font-bold text-white">사주 원국</h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-sub">
-                  {data.profile.age}세
+                  {data.input.gender === 'male' ? '乾命' : '坤命'}
                 </span>
               </div>
               <div className="flex flex-col text-[11px] text-text-sub gap-1">
                 <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> {data.profile.birth}
+                  <Calendar className="w-3 h-3" /> {data.input.birth}
                 </div>
                 <div className="flex items-center gap-1 text-neon-primary font-bold">
-                  <Zap className="w-3 h-3" /> {data.core.ilgans} 일간
+                  <Zap className="w-3 h-3" /> {data.dayMaster.kor} 일간
                 </div>
               </div>
             </div>
@@ -110,7 +117,10 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
                 <span className="text-[9px] text-text-sub uppercase tracking-tighter opacity-60">{label}</span>
                 <div className="w-14 h-14 md:w-16 md:h-16 glass-panel flex flex-col items-center justify-center border-white/10 group hover:border-neon-secondary/30 transition-colors">
                   <span className="text-base md:text-lg font-bold text-white tracking-widest">
-                    {(data.saju as any)[key].display}
+                    {(data.pillars as any)[key].kor}
+                  </span>
+                  <span className="text-[10px] text-text-sub opacity-40 font-serif">
+                    {(data.pillars as any)[key].hanja}
                   </span>
                 </div>
               </div>
@@ -137,24 +147,27 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">오행 분포</span>
-              <span className="text-[10px] text-text-sub/50">8자 기준</span>
+              <span className="text-[10px] text-text-sub/50">{data.elements.basis === '8char' ? '8자' : '전체'} 기준</span>
             </div>
             <div className="grid grid-cols-5 gap-2">
-              {Object.entries(data.ohaeng).map(([el, count]) => (
-                <div key={el} className="space-y-1.5">
-                  <div className={`h-1 rounded-full bg-white/5 overflow-hidden`}>
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(count / 8) * 100}%` }}
-                      className={`h-full ${elementColors[el].split(' ')[0].replace('/20', '')}`}
-                    />
+              {['wood', 'fire', 'earth', 'metal', 'water'].map((el) => {
+                const count = (data.elements as any)[el];
+                return (
+                  <div key={el} className="space-y-1.5">
+                    <div className={`h-1 rounded-full bg-white/5 overflow-hidden`}>
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(count / 8) * 100}%` }}
+                        className={`h-full ${elementColors[el].split(' ')[0].replace('/20', '')}`}
+                      />
+                    </div>
+                    <div className={`px-1.5 py-1 rounded-md border text-[10px] font-bold flex items-center justify-between ${elementColors[el]}`}>
+                      <span>{elementLabels[el]}</span>
+                      <span>{count}</span>
+                    </div>
                   </div>
-                  <div className={`px-1.5 py-1 rounded-md border text-[10px] font-bold flex items-center justify-between ${elementColors[el]}`}>
-                    <span>{elementLabels[el]}</span>
-                    <span>{count}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -163,7 +176,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
             <div className="space-y-2">
               <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">특성 및 신살</span>
               <div className="flex flex-wrap gap-2">
-                {data.traits.map((kw, i) => (
+                {data.tags.map((kw, i) => (
                   <span 
                     key={i}
                     className="text-[10px] px-2 py-1 rounded-md bg-neon-secondary/5 border border-neon-secondary/20 text-neon-secondary font-medium"
@@ -187,6 +200,14 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Footer: Data Version/Timestamp */}
+        <div className="flex justify-end items-center gap-2 opacity-30 hover:opacity-100 transition-opacity">
+          <Info className="w-3 h-3 text-text-sub" />
+          <span className="text-[9px] text-text-sub uppercase tracking-tighter">
+            Data Engine: {data.version} | Generated: {new Date(data.generatedAt).toLocaleString()}
+          </span>
         </div>
       </motion.div>
     </div>
