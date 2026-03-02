@@ -1,7 +1,7 @@
 import React from 'react';
 import { UnifiedSajuResult } from '../services/geminiService';
 import { motion } from 'motion/react';
-import { Sparkles, Info, MessageSquare } from 'lucide-react';
+import { Sparkles, Info, MessageSquare, CheckCircle2, AlertTriangle, ArrowRight, XCircle } from 'lucide-react';
 import NeonCard from './ui/NeonCard';
 import GlowButton from './ui/GlowButton';
 
@@ -33,13 +33,14 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
       </div>
 
       <NeonCard className="space-y-10" glowColor="secondary">
+        {/* Section 1: 핵심 분석 */}
         <section>
           <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
             <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
             핵심 분석
           </h3>
           <div className="grid gap-4">
-            {reading.summary.core_points.map((item, i) => (
+            {reading.analysis.core_analysis.map((item, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, x: -10 }}
@@ -54,27 +55,78 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           </div>
         </section>
 
-        <div className="grid md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
-          <div className="space-y-2">
-            <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">분석 태그</span>
-            <div className="flex flex-wrap gap-2">
-              {reading.tags.map((tag, i) => (
-                <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-text-sub">
-                  {tag}
-                </span>
-              ))}
-            </div>
+        {/* Section 2: 핵심 근거 */}
+        <section className="pt-10 border-t border-white/5">
+          <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
+            <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
+            핵심 근거
+          </h3>
+          <div className="grid gap-3">
+            {reading.analysis.logic_basis.map((item, i) => (
+              <div key={i} className="flex items-start gap-3 text-sm text-text-sub/80">
+                <div className="w-1.5 h-1.5 rounded-full bg-neon-secondary/40 mt-1.5 shrink-0" />
+                {item}
+              </div>
+            ))}
           </div>
-          <div className="space-y-2">
-            <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">신살/특성</span>
-            <div className="flex flex-wrap gap-2">
-              {reading.sinsal.map((s, i) => (
-                <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-neon-primary/10 border border-neon-primary/20 text-neon-primary">
-                  {s}
-                </span>
+        </section>
+
+        {/* Section 3: 좋은 흐름 / 위험 신호 */}
+        <div className="grid md:grid-cols-2 gap-6 pt-10 border-t border-white/5">
+          <section className="bg-neon-primary/5 p-6 rounded-2xl border border-neon-primary/20">
+            <h3 className="flex items-center text-sm font-bold text-neon-primary mb-4">
+              <CheckCircle2 className="w-4 h-4 mr-2" /> 좋은 흐름
+            </h3>
+            <ul className="space-y-3 text-sm text-text-main/90">
+              {reading.analysis.good_flow.map((item, i) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-neon-primary mr-2">•</span>
+                  {item}
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
+
+          <section className="bg-accent/5 p-6 rounded-2xl border border-accent/20">
+            <h3 className="flex items-center text-sm font-bold text-accent mb-4">
+              <AlertTriangle className="w-4 h-4 mr-2" /> 위험 신호
+            </h3>
+            <ul className="space-y-3 text-sm text-text-main/90">
+              {reading.analysis.risk_flow.map((item, i) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-accent mr-2">•</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        {/* Section 4: 지금 당장 액션 / 피해야 할 행동 */}
+        <div className="grid md:grid-cols-2 gap-10 pt-10 border-t border-white/5">
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-neon-primary/80 tracking-wider">지금 당장 액션</h3>
+            <ul className="space-y-3">
+              {reading.analysis.action_now.map((item, i) => (
+                <li key={i} className="flex items-start text-sm text-text-main/80">
+                  <ArrowRight className="w-4 h-4 mr-3 mt-0.5 text-neon-primary" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-accent/80 tracking-wider">피해야 할 행동</h3>
+            <ul className="space-y-3">
+              {reading.analysis.avoid_action.map((item, i) => (
+                <li key={i} className="flex items-start text-sm text-text-main/80">
+                  <XCircle className="w-4 h-4 mr-3 mt-0.5 text-accent" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </NeonCard>
 
@@ -112,15 +164,6 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           </GlowButton>
         </div>
       </NeonCard>
-
-      <div className="flex justify-center items-center gap-4 opacity-20">
-        <div className="flex items-center gap-1.5">
-          <Info className="w-3 h-3" />
-          <span className="text-[9px] uppercase tracking-tighter">Session: {reading.session_id}</span>
-        </div>
-        <div className="w-1 h-1 bg-white/50 rounded-full" />
-        <span className="text-[9px] uppercase tracking-tighter">Request: {reading.request_id}</span>
-      </div>
     </motion.div>
   );
 }

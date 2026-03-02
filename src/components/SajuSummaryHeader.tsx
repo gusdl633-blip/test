@@ -14,7 +14,16 @@ const defaultData: UnifiedSajuResult = {
     name: "이주현",
     birth: "1993-03-22",
     calendar: "solar",
-    time: "13:00"
+    time: "13:00",
+    ilgan: "임(壬)",
+    ilgan_display: "⚡ 임 일간"
+  },
+  badges: {
+    ilgan: "임(壬)",
+    strength: "신약",
+    yongsin: "금",
+    gisin: "화",
+    core_pattern: "편인격"
   },
   pillar: {
     hour: "병오",
@@ -27,15 +36,20 @@ const defaultData: UnifiedSajuResult = {
     fire: 2,
     earth: 0,
     metal: 1,
-    water: 2,
-    basis: "8char"
+    water: 2
   },
-  tags: ["#상관강함", "#이동성높음", "#재성흐름"],
   sinsal: ["년살", "장성살", "역마살", "문창귀인"],
+  analysis: {
+    core_analysis: ["사람이 아니라 상황을 계산하는 타입", "방향으로 움직이는 에너지가 강함", "자기 중심이 확고함"],
+    logic_basis: ["일간이 임수이다.", "월지에 묘목이 있어 상관격이다.", "일지에 인목이 있어 식신이 강하다."],
+    good_flow: ["금운", "수운", "북쪽"],
+    risk_flow: ["화운", "토운", "남쪽"],
+    action_now: ["명상", "독서", "기록"],
+    avoid_action: ["충동구매", "과음", "밤샘"]
+  },
   summary: {
     tone: "entp_shaman_female_30s",
-    one_liner: "당신은 생각보다 차갑다. 근데 그게 문제는 아니야.",
-    core_points: ["사람이 아니라 상황을 계산하는 타입", "방향으로 움직이는 에너지가 강함"]
+    one_liner: "당신은 생각보다 차갑다. 근데 그게 문제는 아니야."
   },
   chat_seed_questions: ["내년 연애운은 어때요?", "지금 이직해도 될까요?"]
 };
@@ -63,12 +77,27 @@ const pillarLabels = [
   { key: 'year', label: '년주' },
 ];
 
-export default function SajuSummaryHeader({ data = defaultData }: Props) {
-  const kpis = [
-    { label: '일간', value: data.pillar.day.substring(0, 1) + '수' }, // Simplified for UI
-    { label: '톤', value: "ENTP 무당" },
-    { label: '세션', value: data.session_id.substring(0, 4) },
-    { label: '요청', value: data.request_id.substring(0, 4) },
+export default function SajuSummaryHeader({ data }: Props) {
+  // ✅ deep merge: 부분 data가 와도 항상 UI는 완전한 고정값을 보장
+  const safeData: UnifiedSajuResult = {
+    ...defaultData,
+    ...(data ?? {}),
+    profile: { ...defaultData.profile, ...(data?.profile ?? {}) },
+    badges: { ...defaultData.badges, ...(data?.badges ?? {}) },
+    pillar: { ...defaultData.pillar, ...(data?.pillar ?? {}) },
+    elements: { ...defaultData.elements, ...(data?.elements ?? {}) },
+    analysis: { ...defaultData.analysis, ...(data?.analysis ?? {}) },
+    summary: { ...defaultData.summary, ...(data?.summary ?? {}) },
+    sinsal: (data?.sinsal && data.sinsal.filter(Boolean).length > 0) ? data.sinsal : defaultData.sinsal,
+    chat_seed_questions: (data?.chat_seed_questions && data.chat_seed_questions.filter(Boolean).length > 0) ? data.chat_seed_questions : defaultData.chat_seed_questions,
+  };
+
+  const badges = [
+    { label: '일간', value: safeData.badges.ilgan },
+    { label: '강약', value: safeData.badges.strength },
+    { label: '용신', value: safeData.badges.yongsin },
+    { label: '기신', value: safeData.badges.gisin },
+    { label: '핵심격', value: safeData.badges.core_pattern },
   ];
 
   return (
@@ -88,17 +117,17 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg md:text-xl font-bold text-white">{data.profile.name || '사주 원국'}</h2>
+                <h2 className="text-lg md:text-xl font-bold text-white">{safeData.profile.name || '사주 원국'}</h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-sub">
-                  {data.profile.calendar === 'solar' ? '陽' : '陰'}
+                  {safeData.profile.calendar === 'solar' ? '陽' : '陰'}
                 </span>
               </div>
               <div className="flex flex-col text-[11px] text-text-sub gap-1">
                 <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> {data.profile.birth} {data.profile.time}
+                  <Calendar className="w-3 h-3" /> {safeData.profile.birth} {safeData.profile.time}
                 </div>
                 <div className="flex items-center gap-1 text-neon-primary font-bold">
-                  <Zap className="w-3 h-3" /> {data.pillar.day} 일주
+                  <Zap className="w-3 h-3" /> {safeData.profile.ilgan_display}
                 </div>
               </div>
             </div>
@@ -110,7 +139,7 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
                 <span className="text-[9px] text-text-sub uppercase tracking-tighter opacity-60">{label}</span>
                 <div className="w-14 h-14 md:w-16 md:h-16 glass-panel flex flex-col items-center justify-center border-white/10 group hover:border-neon-secondary/30 transition-colors">
                   <span className="text-base md:text-lg font-bold text-white tracking-widest">
-                    {(data.pillar as any)[key]}
+                    {(safeData.pillar as any)[key]}
                   </span>
                 </div>
               </div>
@@ -118,15 +147,15 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
           </div>
         </div>
 
-        {/* Row B: KPI Bar */}
+        {/* Row B: Badge Bar */}
         <div className="flex flex-wrap gap-3">
-          {kpis.map((kpi, i) => (
+          {badges.map((badge, i) => (
             <div 
               key={i}
               className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3 min-w-[100px] flex-1 md:flex-none"
             >
-              <span className="text-[10px] text-text-sub font-medium uppercase tracking-wider">{kpi.label}</span>
-              <span className="text-xs font-bold text-neon-primary">{kpi.value}</span>
+              <span className="text-[10px] text-text-sub font-medium uppercase tracking-wider">{badge.label}</span>
+              <span className="text-xs font-bold text-neon-primary">{badge.value}</span>
             </div>
           ))}
         </div>
@@ -137,11 +166,11 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">오행 분포</span>
-              <span className="text-[10px] text-text-sub/50">{data.elements.basis === '8char' ? '8자' : '전체'} 기준</span>
+              <span className="text-[10px] text-text-sub/50">8자 기준</span>
             </div>
             <div className="grid grid-cols-5 gap-2">
               {['wood', 'fire', 'earth', 'metal', 'water'].map((el) => {
-                const count = (data.elements as any)[el];
+                const count = (safeData.elements as any)[el];
                 return (
                   <div key={el} className="space-y-1.5">
                     <div className={`h-1 rounded-full bg-white/5 overflow-hidden`}>
@@ -161,25 +190,12 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
             </div>
           </div>
 
-          {/* Right: Tags & Shinsal */}
+          {/* Right: Shinsal */}
           <div className="space-y-4">
             <div className="space-y-2">
               <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">특성 및 신살</span>
-              <div className="flex flex-wrap gap-2">
-                {data.tags.map((kw, i) => (
-                  <span 
-                    key={i}
-                    className="text-[10px] px-2 py-1 rounded-md bg-neon-secondary/5 border border-neon-secondary/20 text-neon-secondary font-medium"
-                  >
-                    {kw}
-                  </span>
-                ))}
-              </div>
-            </div>
-            
-            {data.sinsal && data.sinsal.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {data.sinsal.filter(Boolean).map((item) => (
+                {safeData.sinsal && safeData.sinsal.filter(Boolean).map((item) => (
                   <span 
                     key={item} 
                     className="px-2 py-0.5 rounded-md bg-neon-primary/10 text-neon-primary text-[10px] border border-neon-primary/20 font-medium"
@@ -188,17 +204,10 @@ export default function SajuSummaryHeader({ data = defaultData }: Props) {
                   </span>
                 ))}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
-        {/* Footer: Data Version/Timestamp */}
-        <div className="flex justify-end items-center gap-2 opacity-30 hover:opacity-100 transition-opacity">
-          <Info className="w-3 h-3 text-text-sub" />
-          <span className="text-[9px] text-text-sub uppercase tracking-tighter">
-            Session: {data.session_id} | Request: {data.request_id}
-          </span>
-        </div>
       </motion.div>
     </div>
   );
