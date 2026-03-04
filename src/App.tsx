@@ -18,6 +18,7 @@ export default function App() {
   const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => Math.random().toString(36).substring(7));
+  const [initialChatInput, setInitialChatInput] = useState<string>('');
 
   // Load profile from local storage on mount
   useEffect(() => {
@@ -127,15 +128,16 @@ export default function App() {
 
       {/* Header */}
       <header className="p-6 flex justify-between items-center z-50">
-        <div 
-          className="flex items-center space-x-3 cursor-pointer group" 
-          onClick={() => {
-            if (profile) {
-              window.location.hash = '';
-              setView('dashboard');
-            }
-          }}
-        >
+          <div 
+            className="flex items-center space-x-3 cursor-pointer group" 
+            onClick={() => {
+              if (profile) {
+                setInitialChatInput('');
+                window.location.hash = '';
+                setView('dashboard');
+              }
+            }}
+          >
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center group-hover:border-neon-primary/50 transition-all shadow-[0_0_20px_rgba(0,255,156,0.1)]">
             <Sparkles className="w-6 h-6 text-neon-primary" />
           </div>
@@ -148,7 +150,10 @@ export default function App() {
         {profile && (
           <div className="flex items-center space-x-3">
             <button 
-              onClick={() => setView('chat')}
+              onClick={() => {
+                setInitialChatInput('');
+                setView('chat');
+              }}
               className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${
                 view === 'chat' 
                   ? 'bg-neon-secondary/20 border-neon-secondary text-neon-secondary shadow-[0_0_15px_rgba(91,225,255,0.2)]' 
@@ -248,7 +253,8 @@ export default function App() {
                 <ResultCard 
                   reading={reading} 
                   categoryLabel={CATEGORIES.find(c => c.id === currentCategory)?.label || ''}
-                  onConsult={() => {
+                  onConsult={(question?: string) => {
+                    setInitialChatInput(question || '');
                     setView('chat');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -265,7 +271,11 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="container mx-auto px-6 py-4"
             >
-              <ChatInterface profile={profile} sessionId={sessionId} />
+              <ChatInterface 
+                profile={profile} 
+                sessionId={sessionId} 
+                initialMessage={initialChatInput} 
+              />
             </motion.div>
           )}
         </AnimatePresence>

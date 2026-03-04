@@ -26,9 +26,9 @@ export default function ChatInterface({ profile, sessionId, initialMessage }: Pr
 
   useEffect(() => {
     if (initialMessage) {
-      handleSend(initialMessage);
+      setInput(initialMessage);
     }
-  }, []);
+  }, [initialMessage]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,7 +140,7 @@ export default function ChatInterface({ profile, sessionId, initialMessage }: Pr
           {chips.map((chip, i) => (
             <button 
               key={i}
-              onClick={() => handleSend(chip)}
+              onClick={() => setInput(chip)}
               className="text-[10px] bg-white/5 hover:bg-neon-secondary/10 border border-white/10 hover:border-neon-secondary/30 text-text-sub hover:text-neon-secondary px-3 py-1.5 rounded-full transition-all duration-200"
             >
               {chip}

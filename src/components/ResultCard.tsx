@@ -8,7 +8,7 @@ import GlowButton from './ui/GlowButton';
 interface Props {
   reading: UnifiedSajuResult;
   categoryLabel: string;
-  onConsult: () => void;
+  onConsult: (question?: string) => void;
 }
 
 export default function ResultCard({ reading, categoryLabel, onConsult }: Props) {
@@ -143,10 +143,31 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           </div>
           
           <div className="flex flex-wrap gap-2">
+            {[
+              "연애운 더 깊게",
+              "이직 타이밍",
+              "상대 성향(생일 필요)",
+              "돈 관리법",
+              "이번달 조심할 행동",
+              "딱 한가지 조언만"
+            ].map((q, i) => (
+              <button 
+                key={`fixed-${i}`} 
+                onClick={() => onConsult(q)}
+                className="relative z-10 text-[10px] bg-neon-secondary/5 hover:bg-neon-secondary/10 border border-neon-secondary/20 hover:border-neon-secondary/40 px-3 py-1.5 rounded-full transition-all text-left text-neon-secondary/80 hover:text-neon-secondary"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+          
+          <div className="h-[1px] bg-white/5 w-full my-2" />
+
+          <div className="flex flex-wrap gap-2">
             {reading.chat_seed_questions.map((q, i) => (
               <button 
                 key={i} 
-                onClick={onConsult}
+                onClick={() => onConsult(q)}
                 className="relative z-10 text-xs bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-xl transition-all text-left text-text-main/70 hover:text-neon-secondary hover:border-neon-secondary/30"
               >
                 {q}
