@@ -16,7 +16,10 @@ const defaultData: UnifiedSajuResult = {
     calendar: "solar",
     time: "13:00",
     ilgan: "임(壬)",
-    ilgan_display: "⚡ 임 일간"
+    ilgan_display: "⚡ 임 일간",
+    mbti: "ENTP",
+    zodiac_korean: "양자리",
+    enneagram: "7w8"
   },
   badges: {
     ilgan: "임(壬)",
@@ -115,6 +118,9 @@ export default function SajuSummaryHeader({ data }: Props) {
     { label: '용신', value: safeData.badges.yongsin },
     { label: '기신', value: safeData.badges.gisin },
     { label: '핵심격', value: safeData.badges.core_pattern },
+    ...(safeData.profile.mbti ? [{ label: 'MBTI', value: safeData.profile.mbti }] : []),
+    ...(safeData.profile.zodiac_korean ? [{ label: '별자리', value: safeData.profile.zodiac_korean }] : []),
+    ...(safeData.profile.enneagram ? [{ label: '애니어그램', value: safeData.profile.enneagram }] : []),
   ];
 
   return (

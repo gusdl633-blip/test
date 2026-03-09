@@ -71,7 +71,17 @@ export async function generateUnifiedSaju(
 {
   "session_id": "${session_id}",
   "request_id": "${request_id}",
-  "profile": { "name": "", "birth": "", "calendar": "", "time": "", "ilgan": "", "ilgan_display": "" },
+  "profile": { 
+    "name": "", 
+    "birth": "", 
+    "calendar": "", 
+    "time": "", 
+    "ilgan": "", 
+    "ilgan_display": "",
+    "mbti": "",
+    "zodiac_korean": "",
+    "enneagram": ""
+  },
   "badges": { "ilgan": "", "strength": "", "yongsin": "", "gisin": "", "core_pattern": "" },
   "pillar": { "year":"", "month":"", "day":"", "hour":"" },
   "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0 },
@@ -137,7 +147,10 @@ MBTI: ${profile.mbti || '미지정'}
               calendar: { type: Type.STRING },
               time: { type: Type.STRING },
               ilgan: { type: Type.STRING },
-              ilgan_display: { type: Type.STRING }
+              ilgan_display: { type: Type.STRING },
+              mbti: { type: Type.STRING },
+              zodiac_korean: { type: Type.STRING },
+              enneagram: { type: Type.STRING }
             },
             required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
           },
@@ -297,7 +310,10 @@ MBTI: ${profile.mbti || '미지정'}
               calendar: { type: Type.STRING },
               time: { type: Type.STRING },
               ilgan: { type: Type.STRING },
-              ilgan_display: { type: Type.STRING }
+              ilgan_display: { type: Type.STRING },
+              mbti: { type: Type.STRING },
+              zodiac_korean: { type: Type.STRING },
+              enneagram: { type: Type.STRING }
             },
             required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
           },
@@ -432,7 +448,21 @@ export async function chatWithSaju(
         properties: {
           session_id: { type: Type.STRING },
           request_id: { type: Type.STRING },
-          profile: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, birth: { type: Type.STRING }, calendar: { type: Type.STRING }, time: { type: Type.STRING }, ilgan: { type: Type.STRING }, ilgan_display: { type: Type.STRING } } },
+          profile: { 
+            type: Type.OBJECT, 
+            properties: { 
+              name: { type: Type.STRING }, 
+              birth: { type: Type.STRING }, 
+              calendar: { type: Type.STRING }, 
+              time: { type: Type.STRING }, 
+              ilgan: { type: Type.STRING }, 
+              ilgan_display: { type: Type.STRING },
+              mbti: { type: Type.STRING },
+              zodiac_korean: { type: Type.STRING },
+              enneagram: { type: Type.STRING }
+            },
+            required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
+          },
           badges: { type: Type.OBJECT, properties: { ilgan: { type: Type.STRING }, strength: { type: Type.STRING }, yongsin: { type: Type.STRING }, gisin: { type: Type.STRING }, core_pattern: { type: Type.STRING } } },
           pillar: { type: Type.OBJECT, properties: { year: { type: Type.STRING }, month: { type: Type.STRING }, day: { type: Type.STRING }, hour: { type: Type.STRING } } },
           elements: { type: Type.OBJECT, properties: { wood: { type: Type.NUMBER }, fire: { type: Type.NUMBER }, earth: { type: Type.NUMBER }, metal: { type: Type.NUMBER }, water: { type: Type.NUMBER } } },

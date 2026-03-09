@@ -21,6 +21,9 @@ export interface UnifiedSajuResult {
     time: string;
     ilgan: string;
     ilgan_display: string;
+    mbti?: string;
+    zodiac_korean?: string;
+    enneagram?: string;
   };
   badges: {
     ilgan: string;
