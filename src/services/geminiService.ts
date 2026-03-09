@@ -10,6 +10,9 @@ export interface SajuProfile {
   birthTime?: string;
   timeKnown: boolean;
   location?: string;
+  mbti?: string;
+  zodiac_korean?: string;
+  enneagram?: string | null;
 }
 
 export const CATEGORIES = [
@@ -69,6 +72,12 @@ export interface UnifiedSajuResult {
     tone: "entp_shaman_female_30s";
     one_liner: string;
   };
+  extended_identity: {
+    core_engine: string;
+    thinking_style: string;
+    instinct_style: string;
+    motivation_core: string;
+  };
   chat_seed_questions: string[];
 }
 
@@ -109,12 +118,22 @@ export async function generateUnifiedSaju(
 
 [데이터 생성 및 매핑 규칙 (7단계 구조)]
 1. summary.one_liner: 한 줄 직설 요약 (강하게 팩트 꽂기)
-2. analysis.logic_basis: 핵심 근거 3~4개 (명리학적 구조 기반 짧은 문장)
-3. analysis.good_flow: 좋은 흐름 3개 (짧은 명사형)
-4. analysis.risk_flow: 위험 신호 3개 (짧은 명사형)
-5. analysis.action_now: 지금 액션 3개 (행동 위주 단문)
-6. analysis.avoid_action: 피해야 할 행동 3개 (행동 위주 단문)
-7. analysis.core_analysis: [구조 분석1, 구조 분석2, 마지막 한 줄 경고(강하게)] - 총 3개 고정.
+2. extended_identity: 사주(엔진), MBTI(알고리즘), 별자리(기질), 애니어그램(욕망)을 교차 분석하여 인간의 작동 원리를 정의.
+   - core_engine: 사주 기반 에너지 구조
+   - thinking_style: MBTI 기반 인지/의사결정 패턴
+   - instinct_style: 별자리 기반 기질/충동성/속도
+   - motivation_core: 애니어그램 기반 동기/두려움 (데이터가 null이면 "분석 제외"로 표시)
+3. analysis.logic_basis: 핵심 근거 3~4개 (명리학적 구조 기반 짧은 문장)
+4. analysis.good_flow: 좋은 흐름 3개 (짧은 명사형)
+5. analysis.risk_flow: 위험 신호 3개 (짧은 명사형)
+6. analysis.action_now: 지금 액션 3개 (행동 위주 단문)
+7. analysis.avoid_action: 피해야 할 행동 3개 (행동 위주 단문)
+8. analysis.core_analysis: [구조 분석1, 구조 분석2, 마지막 한 줄 경고(강하게)] - 총 3개 고정.
+
+[통합 분석 가이드]
+- 사주(에너지) -> MBTI(사고) -> 별자리(기질) -> 애니어그램(욕망) 순으로 교차 분석한다.
+- 단독 분석 절대 금지. 항상 사주를 엔진으로 두고 나머지를 결합하여 "뾰족하게" 해석하라.
+- 예: "임수는 판을 읽고, ENTP는 구조를 깨며, 양자리는 바로 들이밀고, 7w8은 이기려고 움직인다. 그래서 너는 판단->실행->분석 순으로 움직인다."
 
 [출력 스키마]
 {
@@ -125,6 +144,12 @@ export async function generateUnifiedSaju(
   "pillar": { "year":"", "month":"", "day":"", "hour":"" },
   "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0 },
   "sinsal": [],
+  "extended_identity": {
+    "core_engine": "",
+    "thinking_style": "",
+    "instinct_style": "",
+    "motivation_core": ""
+  },
   "analysis": {
     "core_analysis": ["", "", ""],
     "logic_basis": ["", "", "", ""],
@@ -146,6 +171,9 @@ export async function generateUnifiedSaju(
 생년월일: ${profile.birthDate} (${profile.calendarType === 'solar' ? '양력' : '음력'})
 출생시간: ${profile.timeKnown ? profile.birthTime : '모름'}
 출생지: ${profile.location || '미지정'}
+MBTI: ${profile.mbti || '미지정'}
+별자리: ${profile.zodiac_korean || '미지정'}
+애니어그램: ${profile.enneagram || 'null'}
 
 위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
@@ -205,6 +233,16 @@ export async function generateUnifiedSaju(
             required: ["wood", "fire", "earth", "metal", "water"]
           },
           sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          extended_identity: {
+            type: Type.OBJECT,
+            properties: {
+              core_engine: { type: Type.STRING },
+              thinking_style: { type: Type.STRING },
+              instinct_style: { type: Type.STRING },
+              motivation_core: { type: Type.STRING }
+            },
+            required: ["core_engine", "thinking_style", "instinct_style", "motivation_core"]
+          },
           analysis: {
             type: Type.OBJECT,
             properties: {
@@ -227,7 +265,7 @@ export async function generateUnifiedSaju(
           },
           chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
-        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "analysis", "summary", "chat_seed_questions"]
+        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "extended_identity", "analysis", "summary", "chat_seed_questions"]
       }
     }
   });
@@ -278,12 +316,22 @@ export async function generateSajuReading(
 
 [데이터 생성 및 매핑 규칙 (7단계 구조)]
 1. summary.one_liner: 한 줄 직설 요약 (강하게 팩트 꽂기)
-2. analysis.logic_basis: 핵심 근거 3~4개 (명리학적 구조 기반 짧은 문장)
-3. analysis.good_flow: 좋은 흐름 3개 (짧은 명사형)
-4. analysis.risk_flow: 위험 신호 3개 (짧은 명사형)
-5. analysis.action_now: 지금 액션 3개 (행동 위주 단문)
-6. analysis.avoid_action: 피해야 할 행동 3개 (행동 위주 단문)
-7. analysis.core_analysis: [구조 분석1, 구조 분석2, 마지막 한 줄 경고(강하게)] - 총 3개 고정.
+2. extended_identity: 사주(엔진), MBTI(알고리즘), 별자리(기질), 애니어그램(욕망)을 교차 분석하여 인간의 작동 원리를 정의.
+   - core_engine: 사주 기반 에너지 구조
+   - thinking_style: MBTI 기반 인지/의사결정 패턴
+   - instinct_style: 별자리 기반 기질/충동성/속도
+   - motivation_core: 애니어그램 기반 동기/두려움 (데이터가 null이면 "분석 제외"로 표시)
+3. analysis.logic_basis: 핵심 근거 3~4개 (명리학적 구조 기반 짧은 문장)
+4. analysis.good_flow: 좋은 흐름 3개 (짧은 명사형)
+5. analysis.risk_flow: 위험 신호 3개 (짧은 명사형)
+6. analysis.action_now: 지금 액션 3개 (행동 위주 단문)
+7. analysis.avoid_action: 피해야 할 행동 3개 (행동 위주 단문)
+8. analysis.core_analysis: [구조 분석1, 구조 분석2, 마지막 한 줄 경고(강하게)] - 총 3개 고정.
+
+[통합 분석 가이드]
+- 사주(에너지) -> MBTI(사고) -> 별자리(기질) -> 애니어그램(욕망) 순으로 교차 분석한다.
+- 단독 분석 절대 금지. 항상 사주를 엔진으로 두고 나머지를 결합하여 "뾰족하게" 해석하라.
+- 예: "임수는 판을 읽고, ENTP는 구조를 깨며, 양자리는 바로 들이밀고, 7w8은 이기려고 움직인다. 그래서 너는 판단->실행->분석 순으로 움직인다."
 
 [출력 스키마]
 {
@@ -294,6 +342,12 @@ export async function generateSajuReading(
   "pillar": { "year":"", "month":"", "day":"", "hour":"" },
   "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0 },
   "sinsal": [],
+  "extended_identity": {
+    "core_engine": "",
+    "thinking_style": "",
+    "instinct_style": "",
+    "motivation_core": ""
+  },
   "analysis": {
     "core_analysis": ["", "", ""],
     "logic_basis": ["", "", "", ""],
@@ -315,6 +369,9 @@ export async function generateSajuReading(
 생년월일: ${profile.birthDate} (${profile.calendarType === 'solar' ? '양력' : '음력'})
 출생시간: ${profile.timeKnown ? profile.birthTime : '모름'}
 출생지: ${profile.location || '미지정'}
+MBTI: ${profile.mbti || '미지정'}
+별자리: ${profile.zodiac_korean || '미지정'}
+애니어그램: ${profile.enneagram || 'null'}
 
 카테고리: ${categoryLabel}
 
@@ -376,6 +433,16 @@ export async function generateSajuReading(
             required: ["wood", "fire", "earth", "metal", "water"]
           },
           sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          extended_identity: {
+            type: Type.OBJECT,
+            properties: {
+              core_engine: { type: Type.STRING },
+              thinking_style: { type: Type.STRING },
+              instinct_style: { type: Type.STRING },
+              motivation_core: { type: Type.STRING }
+            },
+            required: ["core_engine", "thinking_style", "instinct_style", "motivation_core"]
+          },
           analysis: {
             type: Type.OBJECT,
             properties: {
@@ -398,7 +465,7 @@ export async function generateSajuReading(
           },
           chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
-        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "analysis", "summary", "chat_seed_questions"]
+        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "extended_identity", "analysis", "summary", "chat_seed_questions"]
       }
     }
   });
@@ -449,6 +516,10 @@ export async function chatWithSaju(
 2. 상대의 질문 이면에 숨겨진 패턴과 심리를 짚어낸다.
 3. 답변은 간결하고 명확하게 제공한다.
 
+[통합 분석 가이드]
+- 사주(에너지) -> MBTI(사고) -> 별자리(기질) -> 애니어그램(욕망) 순으로 교차 분석한다.
+- 단독 분석 절대 금지. 항상 사주를 엔진으로 두고 나머지를 결합하여 "뾰족하게" 해석하라.
+
 [출력 스키마]
 {
   "session_id": "${session_id}",
@@ -458,6 +529,12 @@ export async function chatWithSaju(
   "pillar": { "year":"", "month":"", "day":"", "hour":"" },
   "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0 },
   "sinsal": [],
+  "extended_identity": {
+    "core_engine": "",
+    "thinking_style": "",
+    "instinct_style": "",
+    "motivation_core": ""
+  },
   "analysis": {
     "core_analysis": ["", "", ""],
     "logic_basis": ["", "", "", ""],
@@ -477,12 +554,107 @@ export async function chatWithSaju(
     model: "gemini-3-flash-preview",
     config: {
       systemInstruction,
-      responseMimeType: "application/json"
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          session_id: { type: Type.STRING },
+          request_id: { type: Type.STRING },
+          profile: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              birth: { type: Type.STRING },
+              calendar: { type: Type.STRING },
+              time: { type: Type.STRING },
+              ilgan: { type: Type.STRING },
+              ilgan_display: { type: Type.STRING }
+            },
+            required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
+          },
+          badges: {
+            type: Type.OBJECT,
+            properties: {
+              ilgan: { type: Type.STRING },
+              strength: { type: Type.STRING },
+              yongsin: { type: Type.STRING },
+              gisin: { type: Type.STRING },
+              core_pattern: { type: Type.STRING }
+            },
+            required: ["ilgan", "strength", "yongsin", "gisin", "core_pattern"]
+          },
+          pillar: {
+            type: Type.OBJECT,
+            properties: {
+              year: { type: Type.STRING },
+              month: { type: Type.STRING },
+              day: { type: Type.STRING },
+              hour: { type: Type.STRING }
+            },
+            required: ["year", "month", "day", "hour"]
+          },
+          elements: {
+            type: Type.OBJECT,
+            properties: {
+              wood: { type: Type.NUMBER },
+              fire: { type: Type.NUMBER },
+              earth: { type: Type.NUMBER },
+              metal: { type: Type.NUMBER },
+              water: { type: Type.NUMBER }
+            },
+            required: ["wood", "fire", "earth", "metal", "water"]
+          },
+          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
+          extended_identity: {
+            type: Type.OBJECT,
+            properties: {
+              core_engine: { type: Type.STRING },
+              thinking_style: { type: Type.STRING },
+              instinct_style: { type: Type.STRING },
+              motivation_core: { type: Type.STRING }
+            },
+            required: ["core_engine", "thinking_style", "instinct_style", "motivation_core"]
+          },
+          analysis: {
+            type: Type.OBJECT,
+            properties: {
+              core_analysis: { type: Type.ARRAY, items: { type: Type.STRING } },
+              logic_basis: { type: Type.ARRAY, items: { type: Type.STRING } },
+              good_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
+              risk_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
+              action_now: { type: Type.ARRAY, items: { type: Type.STRING } },
+              avoid_action: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["core_analysis", "logic_basis", "good_flow", "risk_flow", "action_now", "avoid_action"]
+          },
+          summary: {
+            type: Type.OBJECT,
+            properties: {
+              tone: { type: Type.STRING },
+              one_liner: { type: Type.STRING }
+            },
+            required: ["tone", "one_liner"]
+          },
+          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "extended_identity", "analysis", "summary", "chat_seed_questions"]
+      }
     }
   });
 
   const historyContext = history.map(h => `${h.role === 'user' ? '사용자' : '상담가'}: ${h.message}`).join('\n');
-  const prompt = `사용자 사주: ${JSON.stringify(profile)}\n이전 대화:\n${historyContext}\n\n사용자 질문: ${userMessage}\n\n위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
+  const prompt = `사용자 프로필:
+MBTI: ${profile.mbti || '미지정'}
+별자리: ${profile.zodiac_korean || '미지정'}
+애니어그램: ${profile.enneagram || 'null'}
+
+사용자 사주: ${JSON.stringify(profile)}
+이전 대화:
+${historyContext}
+
+사용자 질문: ${userMessage}
+
+위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   const response = await chat.sendMessage({ message: prompt });
   return JSON.parse(response.text || "{}");

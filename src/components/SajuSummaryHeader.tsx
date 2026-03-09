@@ -51,6 +51,12 @@ const defaultData: UnifiedSajuResult = {
     tone: "entp_shaman_female_30s",
     one_liner: "당신은 생각보다 차갑다. 근데 그게 문제는 아니야."
   },
+  extended_identity: {
+    core_engine: "임수 일간의 냉철한 판단력",
+    thinking_style: "ENTP 특유의 논리적 구조 파괴",
+    instinct_style: "양자리의 저돌적인 실행력",
+    motivation_core: "7w8의 결핍 없는 확장 욕구"
+  },
   chat_seed_questions: ["내년 연애운은 어때요?", "지금 이직해도 될까요?"]
 };
 
@@ -88,6 +94,7 @@ export default function SajuSummaryHeader({ data }: Props) {
     elements: { ...defaultData.elements, ...(data?.elements ?? {}) },
     analysis: { ...defaultData.analysis, ...(data?.analysis ?? {}) },
     summary: { ...defaultData.summary, ...(data?.summary ?? {}) },
+    extended_identity: { ...defaultData.extended_identity, ...(data?.extended_identity ?? {}) },
     sinsal: (data?.sinsal && data.sinsal.filter(Boolean).length > 0) ? data.sinsal : defaultData.sinsal,
     chat_seed_questions: (data?.chat_seed_questions && data.chat_seed_questions.filter(Boolean).length > 0) ? data.chat_seed_questions : defaultData.chat_seed_questions,
   };

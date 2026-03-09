@@ -17,19 +17,38 @@ export default function ProfileForm({ onSubmit }: Props) {
     birthTime: '',
     timeKnown: true,
     location: '',
+    mbti: '',
+    zodiac_korean: '양자리',
+    enneagram: '',
   });
+
+  const mbtiList = [
+    'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+    'ISTP', 'ISFP', 'INFP', 'INTP',
+    'ESTP', 'ESFP', 'ENFP', 'ENTP',
+    'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ'
+  ];
+
+  const zodiacList = [
+    '양자리', '황소자리', '쌍둥이자리', '게자리',
+    '사자자리', '처녀자리', '천칭자리', '전갈자리',
+    '사수자리', '염소자리', '물병자리', '물고기자리'
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      enneagram: formData.enneagram?.trim() || null
+    });
   };
 
   return (
     <div className="max-w-md mx-auto py-10">
       <NeonCard className="space-y-8">
         <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight text-neon-primary">사주 정보 입력</h2>
-          <p className="text-sm text-text-sub">당신의 운명을 읽기 위한 최소한의 정보입니다.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-neon-primary">인간 구조 분석 정보</h2>
+          <p className="text-sm text-text-sub">사주와 현대 심리학을 결합하여 당신을 더 뾰족하게 분석합니다.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -69,25 +88,55 @@ export default function ProfileForm({ onSubmit }: Props) {
             onChange={e => setFormData({ ...formData, birthDate: (e.target as HTMLInputElement).value })}
           />
 
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center px-1">
-              <label className="text-sm font-medium text-text-sub">출생 시간</label>
-              <label className="flex items-center text-xs text-text-sub/70 cursor-pointer hover:text-neon-primary transition-colors">
-                <input
-                  type="checkbox"
-                  className="mr-1.5 accent-neon-primary"
-                  checked={!formData.timeKnown}
-                  onChange={e => setFormData({ ...formData, timeKnown: !e.target.checked })}
-                />
-                모름
-              </label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center px-1">
+                <label className="text-sm font-medium text-text-sub">출생 시간</label>
+                <label className="flex items-center text-xs text-text-sub/70 cursor-pointer hover:text-neon-primary transition-colors">
+                  <input
+                    type="checkbox"
+                    className="mr-1.5 accent-neon-primary"
+                    checked={!formData.timeKnown}
+                    onChange={e => setFormData({ ...formData, timeKnown: !e.target.checked })}
+                  />
+                  모름
+                </label>
+              </div>
+              <input
+                type="time"
+                disabled={!formData.timeKnown}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-text-main disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-neon-primary/30 transition-all"
+                value={formData.birthTime}
+                onChange={e => setFormData({ ...formData, birthTime: e.target.value })}
+              />
             </div>
-            <input
-              type="time"
-              disabled={!formData.timeKnown}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-text-main disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-neon-primary/30 transition-all"
-              value={formData.birthTime}
-              onChange={e => setFormData({ ...formData, birthTime: e.target.value })}
+
+            <GlassInput
+              as="select"
+              label="MBTI"
+              value={formData.mbti}
+              onChange={e => setFormData({ ...formData, mbti: (e.target as HTMLSelectElement).value })}
+            >
+              <option value="">선택 안함</option>
+              {mbtiList.map(m => <option key={m} value={m}>{m}</option>)}
+            </GlassInput>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <GlassInput
+              as="select"
+              label="별자리"
+              value={formData.zodiac_korean}
+              onChange={e => setFormData({ ...formData, zodiac_korean: (e.target as HTMLSelectElement).value })}
+            >
+              {zodiacList.map(z => <option key={z} value={z}>{z}</option>)}
+            </GlassInput>
+
+            <GlassInput
+              label="애니어그램 (선택)"
+              placeholder="예: 7w8, 5"
+              value={formData.enneagram || ''}
+              onChange={e => setFormData({ ...formData, enneagram: (e.target as HTMLInputElement).value })}
             />
           </div>
 

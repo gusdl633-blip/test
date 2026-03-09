@@ -55,6 +55,32 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           </div>
         </section>
 
+        {/* Section: 인간 구조 분석 (Extended Identity) */}
+        <section className="pt-10 border-t border-white/5">
+          <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
+            <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
+            인간 구조 분석
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Core Engine (사주)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.core_engine}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Thinking Algorithm (MBTI)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.thinking_style}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Instinct Temperament (별자리)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.instinct_style}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Motivation Core (애니어그램)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.motivation_core}</div>
+            </div>
+          </div>
+        </section>
+
         {/* Section 2: 핵심 근거 */}
         <section className="pt-10 border-t border-white/5">
           <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
