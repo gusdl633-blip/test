@@ -35,10 +35,15 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
       <NeonCard className="space-y-10" glowColor="secondary">
         {/* Section 1: 핵심 분석 */}
         <section>
-          <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
-            <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
-            핵심 분석
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center">
+              <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
+              핵심 분석
+            </h3>
+            <div className="px-3 py-1 bg-neon-primary/10 border border-neon-primary/30 rounded-lg text-[10px] font-bold text-neon-primary uppercase tracking-wider">
+              {reading.extended_identity.human_type}
+            </div>
+          </div>
           <div className="grid gap-4">
             {reading.analysis.core_analysis.map((item, i) => (
               <motion.div 
@@ -77,6 +82,71 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Motivation Core (애니어그램)</div>
               <div className="text-sm text-text-main font-medium">{reading.extended_identity.motivation_core}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Weakness Pattern (구조적 결함)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.weakness_pattern}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-[10px] text-text-sub/50 uppercase tracking-wider mb-1">Relationship Pattern (관계 방식)</div>
+              <div className="text-sm text-text-main font-medium">{reading.extended_identity.relationship_pattern}</div>
+            </div>
+            {reading.extended_identity.compatibility_type && (
+              <div className="p-4 rounded-xl bg-neon-primary/5 border border-neon-primary/20 sm:col-span-2">
+                <div className="text-[10px] text-neon-primary uppercase tracking-wider mb-1">Compatibility Type (궁합 유형)</div>
+                <div className="text-sm text-text-main font-bold">{reading.extended_identity.compatibility_type}</div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Section: 인간 유형 카드 (Human Type Card) */}
+        <section className="pt-10 border-t border-white/5">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center">
+              <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
+              당신의 인간 유형
+            </h3>
+          </div>
+          
+          <div className="bg-gradient-to-br from-neon-secondary/10 to-neon-primary/10 border border-white/10 rounded-3xl p-8 space-y-8">
+            <div className="text-center space-y-2">
+              <div className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+                {reading.human_type_card.title}
+              </div>
+              <p className="text-sm text-text-sub/70 italic">
+                "{reading.human_type_card.share_summary}"
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-neon-primary uppercase tracking-widest flex items-center">
+                  <CheckCircle2 className="w-4 h-4 mr-2" /> 강점
+                </h4>
+                <ul className="space-y-3">
+                  {reading.human_type_card.strengths.map((s, i) => (
+                    <li key={i} className="flex items-start text-sm text-text-main/90">
+                      <span className="text-neon-primary mr-2">•</span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-widest flex items-center">
+                  <AlertTriangle className="w-4 h-4 mr-2" /> 약점
+                </h4>
+                <ul className="space-y-3">
+                  {reading.human_type_card.weaknesses.map((w, i) => (
+                    <li key={i} className="flex items-start text-sm text-text-main/90">
+                      <span className="text-accent mr-2">•</span>
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </section>
