@@ -12,6 +12,17 @@ interface Props {
 }
 
 export default function ResultCard({ reading, categoryLabel, onConsult }: Props) {
+
+  if (!reading) return null;
+
+  if (!reading.summary || !reading.analysis || !reading.extended_identity) {
+    return (
+      <div className="py-32 text-center text-text-sub">
+        분석 데이터를 불러오는 중이다.
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -41,11 +52,11 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
               핵심 분석
             </h3>
             <div className="px-3 py-1 bg-neon-primary/10 border border-neon-primary/30 rounded-lg text-[10px] font-bold text-neon-primary uppercase tracking-wider">
-              {reading.extended_identity.human_type}
+              {reading?.extended_identity?.human_type ?? ""}
             </div>
           </div>
           <div className="grid gap-4">
-            {reading.analysis.core_analysis.map((item, i) => (
+            {rereading?.analysis?.core_analysis?.map((item, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, x: -10 }}
@@ -260,7 +271,7 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           <div className="h-[1px] bg-white/5 w-full my-2" />
 
           <div className="flex flex-wrap gap-2">
-            {reading.chat_seed_questions.map((q, i) => (
+            {reading?.chat_seed_questions?.map((q, i) => (
               <button 
                 key={i} 
                 onClick={() => onConsult(q)}
