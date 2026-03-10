@@ -56,18 +56,7 @@ export default function ChatInterface({
     try {
       const requestId = Math.random().toString(36).substring(7);
 
-      const result = await chatWithSaju(
-        profile,
-        nextMessages.map((m) => ({
-          role: m.role,
-          message: m.message,
-        })),
-        text,
-        sessionId,
-        requestId,
-        summary,
-        reading
-      );
+      const result = aawait chatWithSaju(profile, history, input, sessionId, requestId, summary, reading);
 
       const assistantText =
         result?.summary?.one_liner ||
