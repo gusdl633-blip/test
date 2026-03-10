@@ -1,12 +1,33 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import type { SajuProfile, UnifiedSajuResult } from "../types";
 export type { SajuProfile, UnifiedSajuResult };
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+type ChatHistoryItem = { role: string; message: string };
+
+async function callGemini<T>(payload: {
+  prompt: string;
+  systemInstruction: string;
+  history?: { role: "user" | "model"; text: string }[];
+}) {
+  const res = await fetch("/api/gemini", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error?.detail || error?.error || "Gemini API request failed");
+  }
+
+  const data = await res.json();
+  return data as T;
+}
 
 export async function generateUnifiedSaju(
-  profile: SajuProfile, 
-  session_id: string, 
+  profile: SajuProfile,
+  session_id: string,
   request_id: string
 ): Promise<UnifiedSajuResult> {
   const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, '30대 여성 ENTP 무당'입니다.
@@ -117,136 +138,29 @@ export async function generateUnifiedSaju(
 }`;
 
   const prompt = `사용자 프로필:
-이름: ${profile.name || '익명'}
+이름: ${profile.name || "익명"}
 성별: ${profile.gender}
-생년월일: ${profile.birthDate} (${profile.calendarType === 'solar' ? '양력' : '음력'})
-출생시간: ${profile.timeKnown ? profile.birthTime : '모름'}
-출생지: ${profile.location || '미지정'}
-MBTI: ${profile.mbti || '미지정'}
-별자리: ${profile.zodiac_korean || '미지정'}
-애니어그램: ${profile.enneagram || 'null'}
+생년월일: ${profile.birthDate} (${profile.calendarType === "solar" ? "양력" : "음력"})
+출생시간: ${profile.timeKnown ? profile.birthTime : "모름"}
+출생지: ${profile.location || "미지정"}
+MBTI: ${profile.mbti || "미지정"}
+별자리: ${profile.zodiac_korean || "미지정"}
+애니어그램: ${profile.enneagram || "null"}
 
 위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          session_id: { type: Type.STRING },
-          request_id: { type: Type.STRING },
-          profile: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              birth: { type: Type.STRING },
-              calendar: { type: Type.STRING },
-              time: { type: Type.STRING },
-              ilgan: { type: Type.STRING },
-              ilgan_display: { type: Type.STRING },
-              mbti: { type: Type.STRING },
-              zodiac_korean: { type: Type.STRING },
-              enneagram: { type: Type.STRING }
-            },
-            required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
-          },
-          badges: {
-            type: Type.OBJECT,
-            properties: {
-              ilgan: { type: Type.STRING },
-              strength: { type: Type.STRING },
-              yongsin: { type: Type.STRING },
-              gisin: { type: Type.STRING },
-              core_pattern: { type: Type.STRING }
-            },
-            required: ["ilgan", "strength", "yongsin", "gisin", "core_pattern"]
-          },
-          pillar: {
-            type: Type.OBJECT,
-            properties: {
-              year: { type: Type.STRING },
-              month: { type: Type.STRING },
-              day: { type: Type.STRING },
-              hour: { type: Type.STRING }
-            },
-            required: ["year", "month", "day", "hour"]
-          },
-          elements: {
-            type: Type.OBJECT,
-            properties: {
-              wood: { type: Type.NUMBER },
-              fire: { type: Type.NUMBER },
-              earth: { type: Type.NUMBER },
-              metal: { type: Type.NUMBER },
-              water: { type: Type.NUMBER }
-            },
-            required: ["wood", "fire", "earth", "metal", "water"]
-          },
-          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
-          extended_identity: {
-            type: Type.OBJECT,
-            properties: {
-              human_type: { type: Type.STRING },
-              core_engine: { type: Type.STRING },
-              thinking_style: { type: Type.STRING },
-              instinct_style: { type: Type.STRING },
-              motivation_core: { type: Type.STRING },
-              weakness_pattern: { type: Type.STRING },
-              relationship_pattern: { type: Type.STRING },
-              compatibility_type: { type: Type.STRING }
-            },
-            required: ["human_type", "core_engine", "thinking_style", "instinct_style", "motivation_core", "weakness_pattern", "relationship_pattern"]
-          },
-          analysis: {
-            type: Type.OBJECT,
-            properties: {
-              core_analysis: { type: Type.ARRAY, items: { type: Type.STRING } },
-              logic_basis: { type: Type.ARRAY, items: { type: Type.STRING } },
-              good_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
-              risk_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
-              action_now: { type: Type.ARRAY, items: { type: Type.STRING } },
-              avoid_action: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["core_analysis", "logic_basis", "good_flow", "risk_flow", "action_now", "avoid_action"]
-          },
-          summary: {
-            type: Type.OBJECT,
-            properties: {
-              tone: { type: Type.STRING },
-              one_liner: { type: Type.STRING }
-            },
-            required: ["tone", "one_liner"]
-          },
-          human_type_card: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-              weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-              share_summary: { type: Type.STRING }
-            },
-            required: ["title", "strengths", "weaknesses", "share_summary"]
-          },
-          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "extended_identity", "analysis", "summary", "human_type_card", "chat_seed_questions"]
-      }
-    }
+  return await callGemini<UnifiedSajuResult>({
+    prompt,
+    systemInstruction,
   });
-
-  return JSON.parse(response.text || "{}");
 }
 
 export const CATEGORIES = [
-  { id: 'total', label: '종합 분석', icon: 'Sparkles' },
-  { id: 'wealth', label: '재물운', icon: 'Coins' },
-  { id: 'love', label: '애정운', icon: 'Heart' },
-  { id: 'career', label: '직업운', icon: 'Briefcase' },
-  { id: 'health', label: '건강운', icon: 'Activity' }
+  { id: "total", label: "종합 분석", icon: "Sparkles" },
+  { id: "wealth", label: "재물운", icon: "Coins" },
+  { id: "love", label: "애정운", icon: "Heart" },
+  { id: "career", label: "직업운", icon: "Briefcase" },
+  { id: "health", label: "건강운", icon: "Activity" },
 ];
 
 export async function generateSajuReading(
@@ -255,7 +169,8 @@ export async function generateSajuReading(
   session_id: string,
   request_id: string
 ): Promise<UnifiedSajuResult> {
-  const category = CATEGORIES.find(c => c.id === categoryId)?.label || '종합';
+  const category = CATEGORIES.find((c) => c.id === categoryId)?.label || "종합";
+
   const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, '30대 여성 ENTP 무당'입니다.
 당신은 현재 사용자의 "${category}"에 집중하여 분석을 수행합니다.
 
@@ -280,133 +195,26 @@ export async function generateSajuReading(
 (generateUnifiedSaju와 동일한 스키마 사용)`;
 
   const prompt = `사용자 프로필:
-이름: ${profile.name || '익명'}
+이름: ${profile.name || "익명"}
 성별: ${profile.gender}
-생년월일: ${profile.birthDate} (${profile.calendarType === 'solar' ? '양력' : '음력'})
-출생시간: ${profile.timeKnown ? profile.birthTime : '모름'}
-MBTI: ${profile.mbti || '미지정'}
-별자리: ${profile.zodiac_korean || '미지정'}
-애니어그램: ${profile.enneagram || 'null'}
+생년월일: ${profile.birthDate} (${profile.calendarType === "solar" ? "양력" : "음력"})
+출생시간: ${profile.timeKnown ? profile.birthTime : "모름"}
+MBTI: ${profile.mbti || "미지정"}
+별자리: ${profile.zodiac_korean || "미지정"}
+애니어그램: ${profile.enneagram || "null"}
 요청 카테고리: ${category}
 
 위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          session_id: { type: Type.STRING },
-          request_id: { type: Type.STRING },
-          profile: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              birth: { type: Type.STRING },
-              calendar: { type: Type.STRING },
-              time: { type: Type.STRING },
-              ilgan: { type: Type.STRING },
-              ilgan_display: { type: Type.STRING },
-              mbti: { type: Type.STRING },
-              zodiac_korean: { type: Type.STRING },
-              enneagram: { type: Type.STRING }
-            },
-            required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
-          },
-          badges: {
-            type: Type.OBJECT,
-            properties: {
-              ilgan: { type: Type.STRING },
-              strength: { type: Type.STRING },
-              yongsin: { type: Type.STRING },
-              gisin: { type: Type.STRING },
-              core_pattern: { type: Type.STRING }
-            },
-            required: ["ilgan", "strength", "yongsin", "gisin", "core_pattern"]
-          },
-          pillar: {
-            type: Type.OBJECT,
-            properties: {
-              year: { type: Type.STRING },
-              month: { type: Type.STRING },
-              day: { type: Type.STRING },
-              hour: { type: Type.STRING }
-            },
-            required: ["year", "month", "day", "hour"]
-          },
-          elements: {
-            type: Type.OBJECT,
-            properties: {
-              wood: { type: Type.NUMBER },
-              fire: { type: Type.NUMBER },
-              earth: { type: Type.NUMBER },
-              metal: { type: Type.NUMBER },
-              water: { type: Type.NUMBER }
-            },
-            required: ["wood", "fire", "earth", "metal", "water"]
-          },
-          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
-          extended_identity: {
-            type: Type.OBJECT,
-            properties: {
-              human_type: { type: Type.STRING },
-              core_engine: { type: Type.STRING },
-              thinking_style: { type: Type.STRING },
-              instinct_style: { type: Type.STRING },
-              motivation_core: { type: Type.STRING },
-              weakness_pattern: { type: Type.STRING },
-              relationship_pattern: { type: Type.STRING },
-              compatibility_type: { type: Type.STRING }
-            },
-            required: ["human_type", "core_engine", "thinking_style", "instinct_style", "motivation_core", "weakness_pattern", "relationship_pattern"]
-          },
-          analysis: {
-            type: Type.OBJECT,
-            properties: {
-              core_analysis: { type: Type.ARRAY, items: { type: Type.STRING } },
-              logic_basis: { type: Type.ARRAY, items: { type: Type.STRING } },
-              good_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
-              risk_flow: { type: Type.ARRAY, items: { type: Type.STRING } },
-              action_now: { type: Type.ARRAY, items: { type: Type.STRING } },
-              avoid_action: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["core_analysis", "logic_basis", "good_flow", "risk_flow", "action_now", "avoid_action"]
-          },
-          summary: {
-            type: Type.OBJECT,
-            properties: {
-              tone: { type: Type.STRING },
-              one_liner: { type: Type.STRING }
-            },
-            required: ["tone", "one_liner"]
-          },
-          human_type_card: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-              weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-              share_summary: { type: Type.STRING }
-            },
-            required: ["title", "strengths", "weaknesses", "share_summary"]
-          },
-          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ["session_id", "request_id", "profile", "badges", "pillar", "elements", "sinsal", "extended_identity", "analysis", "summary", "human_type_card", "chat_seed_questions"]
-      }
-    }
+  return await callGemini<UnifiedSajuResult>({
+    prompt,
+    systemInstruction,
   });
-
-  return JSON.parse(response.text || "{}");
 }
 
 export async function chatWithSaju(
   profile: SajuProfile,
-  history: { role: string; message: string }[],
+  history: ChatHistoryItem[],
   userInput: string,
   session_id: string,
   request_id: string
@@ -433,50 +241,12 @@ export async function chatWithSaju(
 - human_type_card를 대화 맥락에 맞게 업데이트하거나 유지하십시오.
 - 다른 필드들은 대화 맥락에 따라 업데이트하거나 유지하십시오.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      ...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.message }] })),
-      { role: 'user', parts: [{ text: userInput }] }
-    ],
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      // Reuse the same schema for consistency
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          session_id: { type: Type.STRING },
-          request_id: { type: Type.STRING },
-          profile: { 
-            type: Type.OBJECT, 
-            properties: { 
-              name: { type: Type.STRING }, 
-              birth: { type: Type.STRING }, 
-              calendar: { type: Type.STRING }, 
-              time: { type: Type.STRING }, 
-              ilgan: { type: Type.STRING }, 
-              ilgan_display: { type: Type.STRING },
-              mbti: { type: Type.STRING },
-              zodiac_korean: { type: Type.STRING },
-              enneagram: { type: Type.STRING }
-            },
-            required: ["name", "birth", "calendar", "time", "ilgan", "ilgan_display"]
-          },
-          badges: { type: Type.OBJECT, properties: { ilgan: { type: Type.STRING }, strength: { type: Type.STRING }, yongsin: { type: Type.STRING }, gisin: { type: Type.STRING }, core_pattern: { type: Type.STRING } } },
-          pillar: { type: Type.OBJECT, properties: { year: { type: Type.STRING }, month: { type: Type.STRING }, day: { type: Type.STRING }, hour: { type: Type.STRING } } },
-          elements: { type: Type.OBJECT, properties: { wood: { type: Type.NUMBER }, fire: { type: Type.NUMBER }, earth: { type: Type.NUMBER }, metal: { type: Type.NUMBER }, water: { type: Type.NUMBER } } },
-          sinsal: { type: Type.ARRAY, items: { type: Type.STRING } },
-          extended_identity: { type: Type.OBJECT, properties: { human_type: { type: Type.STRING }, core_engine: { type: Type.STRING }, thinking_style: { type: Type.STRING }, instinct_style: { type: Type.STRING }, motivation_core: { type: Type.STRING }, weakness_pattern: { type: Type.STRING }, relationship_pattern: { type: Type.STRING }, compatibility_type: { type: Type.STRING } } },
-          analysis: { type: Type.OBJECT, properties: { core_analysis: { type: Type.ARRAY, items: { type: Type.STRING } }, logic_basis: { type: Type.ARRAY, items: { type: Type.STRING } }, good_flow: { type: Type.ARRAY, items: { type: Type.STRING } }, risk_flow: { type: Type.ARRAY, items: { type: Type.STRING } }, action_now: { type: Type.ARRAY, items: { type: Type.STRING } }, avoid_action: { type: Type.ARRAY, items: { type: Type.STRING } } } },
-          summary: { type: Type.OBJECT, properties: { tone: { type: Type.STRING }, one_liner: { type: Type.STRING } } },
-          human_type_card: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, strengths: { type: Type.ARRAY, items: { type: Type.STRING } }, weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } }, share_summary: { type: Type.STRING } } },
-          chat_seed_questions: { type: Type.ARRAY, items: { type: Type.STRING } }
-        }
-      }
-    },
+  return await callGemini<UnifiedSajuResult>({
+    prompt: userInput,
+    systemInstruction,
+    history: history.map((h) => ({
+      role: h.role === "user" ? "user" : "model",
+      text: h.message,
+    })),
   });
-
-  return JSON.parse(response.text || "{}");
 }
-
