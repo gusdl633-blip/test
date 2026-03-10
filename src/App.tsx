@@ -1,3 +1,6 @@
+const [isLoading, setIsLoading] = useState(false);
+const [errorMessage, setErrorMessage] = useState<string | null>(null);
+const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 import React, { useState, useEffect } from 'react';
 import ProfileForm from './components/ProfileForm';
 import ResultCard from './components/ResultCard';
