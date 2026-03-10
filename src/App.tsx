@@ -1,6 +1,3 @@
-const [isLoading, setIsLoading] = useState(false);
-const [errorMessage, setErrorMessage] = useState<string | null>(null);
-const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 import React, { useState, useEffect } from 'react';
 import ProfileForm from './components/ProfileForm';
 import ResultCard from './components/ResultCard';
@@ -15,14 +12,20 @@ import ErrorModal from "./components/ErrorModal";
 type View = 'onboarding' | 'dashboard' | 'result' | 'chat';
 
 export default function App() {
-  const [view, setView] = useState<View>('onboarding');
-  const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
-  const [currentCategory, setCurrentCategory] = useState<string | null>(null);
-  const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(() => Math.random().toString(36).substring(7));
-  const [initialChatInput, setInitialChatInput] = useState<string>('');
+const [view, setView] = useState<View>("onboarding");
+const [profile, setProfile] = useState<SajuProfile | null>(null);
+const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
+const [currentCategory, setCurrentCategory] = useState<string | null>(null);
+const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
+
+const [isLoading, setIsLoading] = useState(false);
+const [errorMessage, setErrorMessage] = useState<string | null>(null);
+const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+
+const [sessionId, setSessionId] = useState<string>(() =>
+  Math.random().toString(36).substring(7)
+);
+const [initialChatInput, setInitialChatInput] = useState<string>("");
 
   // Load profile from local storage on mount
   useEffect(() => {
@@ -49,60 +52,88 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const fetchSummary = async (p: SajuProfile) => {
+ const fetchSummary = async (p: SajuProfile) => {
+  const run = async () => {
     const requestId = Math.random().toString(36).substring(7);
-    const profileKey = `${p.birthDate}|${p.birthTime || '00:00'}|${p.calendarType}|${p.location || 'none'}|${p.gender}`;
+    const profileKey = `${p.birthDate}|${p.birthTime || "00:00"}|${p.calendarType}|${p.location || "none"}|${p.gender}`;
     const cached = localStorage.getItem(`saju_cache_${profileKey}`);
-    
+
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // We still use cache if it exists, but we might need to re-fetch if schema changed
         if (parsed.session_id && parsed.pillar) {
           setSummary(parsed);
           return;
         }
       } catch (e) {
-        console.error('Failed to parse cached summary:', e);
+        console.error("Failed to parse cached summary:", e);
       }
     }
 
     try {
+      setErrorMessage(null);
+      setIsLoading(true);
+
       const data = await generateUnifiedSaju(p, sessionId, requestId);
       setSummary(data);
       localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
-    } catch (e) {
-      console.error('Failed to fetch summary:', e);
+    } catch (e: any) {
+      console.error("Failed to fetch summary:", e);
+      setErrorMessage("기본 사주 요약을 불러오지 못했다.\n잠시 후 다시 시도해라.");
+      setRetryAction(() => run);
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  await run();
+};
+
   const handleProfileSubmit = async (data: SajuProfile) => {
-    setProfile(data);
-    localStorage.setItem('saju_profile', JSON.stringify(data));
-    window.location.hash = '';
-    setView('dashboard');
-    fetchSummary(data);
+  setProfile(data);
+  localStorage.setItem("saju_profile", JSON.stringify(data));
+  window.location.hash = "";
+  setView("dashboard");
+  await fetchSummary(data);
+};
+
+const handleCategorySelect = async (categoryId: string) => {
+  if (!profile) return;
+
+  const run = async () => {
+    const requestId = Math.random().toString(36).substring(7);
+
+    try {
+      setErrorMessage(null);
+      setCurrentCategory(categoryId);
+      setReading(null);
+      setIsLoading(true);
+      setView("result");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
+      console.log("CATEGORY RESULT:", result);
+
+      setReading(result);
+    } catch (error: any) {
+      console.error("generateSajuReading failed:", error);
+
+      const message =
+        error?.message?.includes("503") ||
+        error?.message?.includes("UNAVAILABLE") ||
+        error?.message?.includes("high demand")
+          ? "지금 해석 엔진 요청이 몰렸다.\n몇 초 뒤 다시 시도해라."
+          : "카테고리 해석 중 문제가 생겼다.\n잠시 후 다시 시도해라.";
+
+      setErrorMessage(message);
+      setRetryAction(() => run);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCategorySelect = async (categoryId: string) => {
-    if (!profile) return;
-    const requestId = Math.random().toString(36).substring(7);
-    setCurrentCategory(categoryId);
-    setIsLoading(true);
-    setView('result');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    try {
-  setIsLoading(true);
-  const result = await generateUnifiedSaju(profile, sessionId, requestId);
-  setResult(result);
-} catch (error) {
-  console.error(error);
-  alert("지금 서버가 잠깐 바빠. 다시 시도해줘.");
-} finally {
-  setIsLoading(false);
-}
-  };
+  await run();
+};
 
   const resetProfile = () => {
     if (confirm('모든 정보와 대화 내역이 초기화됩니다. 계속하시겠습니까?')) {
@@ -298,6 +329,22 @@ export default function App() {
           본 서비스는 인공지능 기술을 활용한 참고용이며, 중대한 결정은 전문가와 상담하시기 바랍니다.
         </p>
       </footer>
+      <ErrorModal
+  open={!!errorMessage}
+  message={errorMessage || ""}
+  onClose={() => {
+    setErrorMessage(null);
+    setRetryAction(null);
+  }}
+  onRetry={
+    retryAction
+      ? async () => {
+          setErrorMessage(null);
+          await retryAction();
+        }
+      : undefined
+  }
+/>
     </div>
   );
 }
