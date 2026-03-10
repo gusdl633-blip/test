@@ -10,19 +10,41 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { prompt } = req.body;
+    const { prompt, systemInstruction, history } = req.body ?? {};
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        error: "Invalid request",
+        detail: "prompt is required",
+      });
+    }
+
+    const contents = [
+      ...(Array.isArray(history)
+        ? history.map((item: any) => ({
+            role: item.role === "user" ? "user" : "model",
+            parts: [{ text: item.text || "" }],
+          }))
+        : []),
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ];
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents,
+      config: {
+        systemInstruction: systemInstruction || "",
+      },
     });
 
     return res.status(200).json({
       text: response.text ?? "",
     });
-
   } catch (error: any) {
-    console.error(error);
+    console.error("Gemini request failed:", error);
 
     return res.status(500).json({
       error: "Gemini request failed",
