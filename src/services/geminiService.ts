@@ -415,105 +415,110 @@ export async function chatWithSaju(
   history: ChatHistoryItem[],
   userInput: string,
   session_id: string,
-  request_id: string
+  request_id: string,
+  summary?: UnifiedSajuResult | null,
+  reading?: UnifiedSajuResult | null
 ): Promise<UnifiedSajuResult> {
-  const { text } = buildFixedSajuPrompt(profile);
+  const fixed = calculateSajuFromProfile(profile);
+
+  const fixedSummary = summary
+    ? {
+        profile: summary.profile,
+        badges: summary.badges,
+        pillar: summary.pillar,
+        elements: summary.elements,
+        sinsal: summary.sinsal,
+        extended_identity: summary.extended_identity,
+        human_type_card: summary.human_type_card,
+        summary: summary.summary,
+      }
+    : null;
+
+  const fixedReading = reading
+    ? {
+        summary: reading.summary,
+        analysis: reading.analysis,
+        extended_identity: reading.extended_identity,
+        human_type_card: reading.human_type_card,
+        chat_seed_questions: reading.chat_seed_questions,
+      }
+    : null;
 
   const systemInstruction = `
 너는 "천명(天命) FUTURISTIC SAJU" 전용 상담 엔진이다.
 너는 사주 계산 엔진이 아니다.
 
 [절대 금지]
-- pillar 재계산 금지
-- elements 재계산 금지
-- sinsal, badges 수정 금지
+- 년주, 월주, 일주, 시주를 다시 계산하지 마라
+- 오행 개수를 다시 계산하지 마라
+- 사주 데이터가 없다고 말하지 마라
+- 생년월일시를 다시 입력하라고 하지 마라
+- 이미 전달된 summary, reading, fixed_saju를 무시하지 마라
+- 이전 상담 맥락과 모순되게 말하지 마라
 
-[역할]
-- 확정된 사주 데이터를 기반으로 상담 답변 생성
-- summary.one_liner에 이번 답변 핵심을 넣는다
-- 전체 스키마를 유지한다
-
-[톤]
-- 30대 여성 ENTP 무당
+[대화 절대 규칙]
+- 현재 대화는 이미 사주 계산이 끝난 사용자에 대한 후속 상담이다
+- 지금 사용자는 현재 profile의 인물 한 명이다
+- summary와 reading은 현재 사용자에 대한 확정 컨텍스트다
+- 답변은 반드시 현재 사용자 기준으로 이어서 말해야 한다
+- 말투는 30대 여성 ENTP 무당
 - 반말
 - 직설적
-- 분석 -> 구조 -> 결론
+- 분석 -> 구조 -> 결론 순
+- 위로 금지
+- 상담사 말투 금지
+- 짧고 세게 말해라
 
-[출력 JSON 스키마]
-{
-  "session_id": "${session_id}",
-  "request_id": "${request_id}",
-  "profile": {
-    "name": "",
-    "birth": "",
-    "calendar": "",
-    "time": "",
-    "ilgan": "",
-    "ilgan_display": "",
-    "mbti": "",
-    "zodiac_korean": "",
-    "enneagram": ""
-  },
-  "badges": {
-    "ilgan": "",
-    "strength": "",
-    "yongsin": "",
-    "gisin": "",
-    "core_pattern": ""
-  },
-  "pillar": {
-    "year": "",
-    "month": "",
-    "day": "",
-    "hour": ""
-  },
-  "elements": {
-    "wood": 0,
-    "fire": 0,
-    "earth": 0,
-    "metal": 0,
-    "water": 0
-  },
-  "sinsal": [],
-  "extended_identity": {
-    "human_type": "",
-    "core_engine": "",
-    "thinking_style": "",
-    "instinct_style": "",
-    "motivation_core": "",
-    "weakness_pattern": "",
-    "relationship_pattern": "",
-    "compatibility_type": ""
-  },
-  "analysis": {
-    "core_analysis": ["", "", ""],
-    "logic_basis": ["", "", "", ""],
-    "good_flow": ["", "", ""],
-    "risk_flow": ["", "", ""],
-    "action_now": ["", "", ""],
-    "avoid_action": ["", "", ""]
-  },
-  "summary": {
-    "tone": "entp_shaman_female_30s",
-    "one_liner": ""
-  },
-  "human_type_card": {
-    "title": "",
-    "strengths": ["", "", ""],
-    "weaknesses": ["", "", ""],
-    "share_summary": ""
-  },
-  "chat_seed_questions": ["", "", ""]
-}
+[역할]
+- 확정된 사주 원국 + MBTI + 별자리 + 애니어그램을 종합해 현재 질문에 답한다
+- summary.one_liner에는 이번 질문에 대한 핵심 한 줄 답변을 넣는다
+- analysis.core_analysis에는 이번 질문에 맞는 핵심 해석 3개를 넣는다
+- chat_seed_questions는 현재 질문과 이어지는 후속 질문 3~6개로 유지한다
+
+[출력 형식]
+- 반드시 UnifiedSajuResult 전체 JSON만 출력
+- 마크다운 금지
+- 코드블록 금지
+- 누락 필드 금지
 `.trim();
 
   const prompt = `
-${text}
+현재 상담 대상 프로필:
+${JSON.stringify(
+  {
+    name: profile.name || "익명",
+    gender: profile.gender,
+    birthDate: profile.birthDate,
+    birthTime: profile.birthTime,
+    calendarType: profile.calendarType,
+    location: profile.location || "",
+    mbti: profile.mbti || "",
+    zodiac_korean: profile.zodiac_korean || "",
+    enneagram: profile.enneagram || "",
+  },
+  null,
+  2
+)}
+
+코드에서 확정된 사주 데이터:
+${JSON.stringify(fixed, null, 2)}
+
+기본 사주 요약 컨텍스트:
+${JSON.stringify(fixedSummary, null, 2)}
+
+현재 보고 있던 결과 카드 컨텍스트:
+${JSON.stringify(fixedReading, null, 2)}
 
 사용자 질문:
 ${userInput}
 
-반드시 전체 스키마를 채운 JSON만 출력하라.
+규칙:
+- fixed, summary, reading은 현재 사용자의 확정 데이터다
+- 이걸 기반으로 바로 이어서 답해라
+- "사주 데이터가 없다" 같은 말 절대 금지
+- 현재 질문에 맞는 실제 상담 답변을 만들어라
+- pillar, elements, sinsal, badges 값은 절대 바꾸지 마라
+- 반드시 UnifiedSajuResult 전체 JSON으로 응답하라
 `.trim();
 
   const aiResult = await callGemini<any>({
