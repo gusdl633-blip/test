@@ -56,7 +56,7 @@ export default function ChatInterface({
     try {
       const requestId = Math.random().toString(36).substring(7);
 
-      const result = aawait chatWithSaju(profile, history, input, sessionId, requestId, summary, reading);
+      const result = await chatWithSaju(profile, history, input, sessionId, requestId, summary, reading);
 
       const assistantText =
         result?.summary?.one_liner ||
