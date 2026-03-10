@@ -7,7 +7,7 @@ async function callGemini<T>(payload: {
   prompt: string;
   systemInstruction: string;
   history?: { role: "user" | "model"; text: string }[];
-}) {
+}): Promise<T> {
   const res = await fetch("/api/gemini", {
     method: "POST",
     headers: {
@@ -26,9 +26,8 @@ async function callGemini<T>(payload: {
   }
 
   const data = await res.json();
+  const raw = typeof data?.text === "string" ? data.text : "{}";
 
-const raw = typeof data?.text === "string" ? data.text : "{}";
-  
   const cleaned = raw
     .replace(/```json/g, "")
     .replace(/```/g, "")
@@ -36,10 +35,7 @@ const raw = typeof data?.text === "string" ? data.text : "{}";
 
   return JSON.parse(cleaned) as T;
 }
-const { prompt, systemInstruction, history } = req.body ?? {};
-config: {
-  systemInstruction: systemInstruction || "",
-}
+
 export async function generateUnifiedSaju(
   profile: SajuProfile,
   session_id: string,
@@ -63,10 +59,10 @@ export async function generateUnifiedSaju(
 - 교훈적 마무리 금지. 설교 금지.
 
 [STYLE EXAMPLE]
-- “너는 사랑을 못 하는 게 아니다. 통과 시험을 보는 거다.”
-- “지금 네 문제는 감정이 아니라 기준이다.”
-- “연애를 전략으로 들면 평생 분석만 하다 끝난다.”
-- “남자를 고르는 게 아니라, 네가 우위에 설 수 있는 판을 고른다.”
+- "너는 사랑을 못 하는 게 아니다. 통과 시험을 보는 거다."
+- "지금 네 문제는 감정이 아니라 기준이다."
+- "연애를 전략으로 들면 평생 분석만 하다 끝난다."
+- "남자를 고르는 게 아니라, 네가 우위에 설 수 있는 판을 고른다."
 
 [최상위 절대 규칙]
 1. 응답은 오직 "단일 JSON"만 출력하며, 다른 텍스트는 절대 포함하지 않습니다.
@@ -107,20 +103,20 @@ export async function generateUnifiedSaju(
 {
   "session_id": "${session_id}",
   "request_id": "${request_id}",
-  "profile": { 
-    "name": "", 
-    "birth": "", 
-    "calendar": "", 
-    "time": "", 
-    "ilgan": "", 
+  "profile": {
+    "name": "",
+    "birth": "",
+    "calendar": "",
+    "time": "",
+    "ilgan": "",
     "ilgan_display": "",
     "mbti": "",
     "zodiac_korean": "",
     "enneagram": ""
   },
   "badges": { "ilgan": "", "strength": "", "yongsin": "", "gisin": "", "core_pattern": "" },
-  "pillar": { "year":"", "month":"", "day":"", "hour":"" },
-  "elements": { "wood":0,"fire":0,"earth":0,"metal":0,"water":0 },
+  "pillar": { "year": "", "month": "", "day": "", "hour": "" },
+  "elements": { "wood": 0, "fire": 0, "earth": 0, "metal": 0, "water": 0 },
   "sinsal": [],
   "extended_identity": {
     "human_type": "",
@@ -140,8 +136,8 @@ export async function generateUnifiedSaju(
     "avoid_action": ["", "", ""]
   },
   "summary": {
-    "tone":"entp_shaman_female_30s",
-    "one_liner":""
+    "tone": "entp_shaman_female_30s",
+    "one_liner": ""
   },
   "human_type_card": {
     "title": "",
@@ -149,7 +145,7 @@ export async function generateUnifiedSaju(
     "weaknesses": ["", "", ""],
     "share_summary": ""
   },
-  "chat_seed_questions":[]
+  "chat_seed_questions": []
 }`;
 
   const prompt = `사용자 프로필:
@@ -165,13 +161,9 @@ MBTI: ${profile.mbti || "미지정"}
 위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   return await callGemini<UnifiedSajuResult>({
-  prompt: userInput,
-  systemInstruction,
-  history: history.map((h) => ({
-    role: h.role === "user" ? "user" : "model",
-    text: h.message,
-  })),
-});
+    prompt,
+    systemInstruction,
+  });
 }
 
 export const CATEGORIES = [
@@ -240,7 +232,7 @@ export async function chatWithSaju(
 ): Promise<UnifiedSajuResult> {
   const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, '30대 여성 ENTP 무당'입니다.
 
-[페르소나: 30대 ENTP 여성 무당]
+[페르소나: 30대 ENTP 여성 ENTP 무당]
 - 논리적, 직설적, 팩트 폭격기.
 - 반말, 단정형, 짧고 리듬감 있는 문장 사용.
 - 분석 -> 구조 -> 결론 순으로 차갑게 통찰.
