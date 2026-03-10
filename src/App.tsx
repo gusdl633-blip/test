@@ -54,6 +54,8 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
 
  const fetchSummary = async (p: SajuProfile) => {
   const run = async () => {
+    setSummary(null);
+
     const requestId = Math.random().toString(36).substring(7);
     const profileKey = `${p.birthDate}|${p.birthTime || "00:00"}|${p.calendarType}|${p.location || "none"}|${p.gender}`;
     const cached = localStorage.getItem(`saju_cache_${profileKey}`);
@@ -90,10 +92,17 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
 };
 
   const handleProfileSubmit = async (data: SajuProfile) => {
+  setSummary(null);
+  setReading(null);
+  setCurrentCategory(null);
+  setInitialChatInput("");
+  setErrorMessage(null);
+
   setProfile(data);
   localStorage.setItem("saju_profile", JSON.stringify(data));
   window.location.hash = "";
   setView("dashboard");
+
   await fetchSummary(data);
 };
 
@@ -115,8 +124,6 @@ const handleCategorySelect = async (categoryId: string) => {
 console.log("CATEGORY RESULT:", result);
 console.log("SUMMARY:", result?.summary);
 console.log("ONE LINER:", result?.summary?.one_liner);
-
-setReading(result);
 
       setReading(result);
     } catch (error: any) {
