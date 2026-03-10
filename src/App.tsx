@@ -89,13 +89,15 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
     try {
-      const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
-      setReading(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
+  setIsLoading(true);
+  const result = await generateUnifiedSaju(profile, sessionId, requestId);
+  setResult(result);
+} catch (error) {
+  console.error(error);
+  alert("지금 서버가 잠깐 바빠. 다시 시도해줘.");
+} finally {
+  setIsLoading(false);
+}
   };
 
   const resetProfile = () => {
