@@ -3,6 +3,86 @@ export type { SajuProfile, UnifiedSajuResult };
 
 type ChatHistoryItem = { role: string; message: string };
 
+function normalizeUnifiedSajuResult(data: any): UnifiedSajuResult {
+  return {
+    session_id: data?.session_id ?? "",
+    request_id: data?.request_id ?? "",
+
+    profile: {
+      name: data?.profile?.name ?? "",
+      birth: data?.profile?.birth ?? "",
+      calendar: data?.profile?.calendar ?? "",
+      time: data?.profile?.time ?? "",
+      ilgan: data?.profile?.ilgan ?? "",
+      ilgan_display: data?.profile?.ilgan_display ?? "",
+      mbti: data?.profile?.mbti ?? "",
+      zodiac_korean: data?.profile?.zodiac_korean ?? "",
+      enneagram: data?.profile?.enneagram ?? "",
+    },
+
+    badges: {
+      ilgan: data?.badges?.ilgan ?? "",
+      strength: data?.badges?.strength ?? "",
+      yongsin: data?.badges?.yongsin ?? "",
+      gisin: data?.badges?.gisin ?? "",
+      core_pattern: data?.badges?.core_pattern ?? "",
+    },
+
+    pillar: {
+      year: data?.pillar?.year ?? "",
+      month: data?.pillar?.month ?? "",
+      day: data?.pillar?.day ?? "",
+      hour: data?.pillar?.hour ?? "",
+    },
+
+    elements: {
+      wood: data?.elements?.wood ?? 0,
+      fire: data?.elements?.fire ?? 0,
+      earth: data?.elements?.earth ?? 0,
+      metal: data?.elements?.metal ?? 0,
+      water: data?.elements?.water ?? 0,
+    },
+
+    sinsal: Array.isArray(data?.sinsal) ? data.sinsal : [],
+
+    extended_identity: {
+      human_type: data?.extended_identity?.human_type ?? "",
+      core_engine: data?.extended_identity?.core_engine ?? "",
+      thinking_style: data?.extended_identity?.thinking_style ?? "",
+      instinct_style: data?.extended_identity?.instinct_style ?? "",
+      motivation_core: data?.extended_identity?.motivation_core ?? "",
+      weakness_pattern: data?.extended_identity?.weakness_pattern ?? "",
+      relationship_pattern: data?.extended_identity?.relationship_pattern ?? "",
+      compatibility_type: data?.extended_identity?.compatibility_type ?? "",
+    },
+
+    analysis: {
+      core_analysis: Array.isArray(data?.analysis?.core_analysis) ? data.analysis.core_analysis : [],
+      logic_basis: Array.isArray(data?.analysis?.logic_basis) ? data.analysis.logic_basis : [],
+      good_flow: Array.isArray(data?.analysis?.good_flow) ? data.analysis.good_flow : [],
+      risk_flow: Array.isArray(data?.analysis?.risk_flow) ? data.analysis.risk_flow : [],
+      action_now: Array.isArray(data?.analysis?.action_now) ? data.analysis.action_now : [],
+      avoid_action: Array.isArray(data?.analysis?.avoid_action) ? data.analysis.avoid_action : [],
+    },
+
+    summary: {
+      tone: data?.summary?.tone ?? "entp_shaman_female_30s",
+      one_liner: data?.summary?.one_liner ?? "",
+    },
+
+    human_type_card: {
+      title: data?.human_type_card?.title ?? "",
+      strengths: Array.isArray(data?.human_type_card?.strengths) ? data.human_type_card.strengths : [],
+      weaknesses: Array.isArray(data?.human_type_card?.weaknesses) ? data.human_type_card.weaknesses : [],
+      share_summary: data?.human_type_card?.share_summary ?? "",
+    },
+
+    chat_seed_questions: Array.isArray(data?.chat_seed_questions)
+      ? data.chat_seed_questions
+      : [],
+  };
+}
+
 async function callGemini<T>(payload: {
   prompt: string;
   systemInstruction: string;
@@ -33,7 +113,13 @@ async function callGemini<T>(payload: {
     .replace(/```/g, "")
     .trim();
 
-  return JSON.parse(cleaned) as T;
+  try {
+    const parsed = JSON.parse(cleaned);
+    return normalizeUnifiedSajuResult(parsed) as T;
+  } catch (e) {
+    console.error("Gemini JSON parse failed:", { raw, cleaned, e });
+    throw new Error("Gemini JSON parse failed");
+  }
 }
 
 export async function generateUnifiedSaju(
@@ -65,39 +151,26 @@ export async function generateUnifiedSaju(
 - "남자를 고르는 게 아니라, 네가 우위에 설 수 있는 판을 고른다."
 
 [최상위 절대 규칙]
-1. 응답은 오직 "단일 JSON"만 출력하며, 다른 텍스트는 절대 포함하지 않습니다.
-2. 입력받은 session_id와 request_id를 그대로 echo 합니다.
-3. 모든 명리학 용어는 "한글"로만 출력합니다.
-4. 마크다운, 이모지, 장식문자 사용을 절대 금지합니다.
-5. 절대로 undefined, null, 누락 필드를 반환하지 않습니다.
+1. 응답은 오직 단일 JSON만 출력한다.
+2. session_id와 request_id를 그대로 echo 한다.
+3. 모든 명리학 용어는 한글로만 출력한다.
+4. 마크다운, 이모지, 장식문자 사용 금지.
+5. undefined, null, 누락 필드 반환 금지.
 
-[데이터 생성 및 매핑 규칙 (7단계 구조)]
-1. summary.one_liner: 한 줄 직설 요약 (강하게 팩트 꽂기)
-2. extended_identity: 사주(엔진), MBTI(알고리즘), 별자리(기질), 애니어그램(욕망)을 교차 분석하여 인간의 작동 원리를 정의.
-   - human_type: "두 단어 구조" (예: 전략형 도전자, 직관형 창작자, 통찰형 분석가, 질서형 관리자, 충동형 개척자, 관찰형 철학자). 사주+MBTI+별자리+애니어그램 조합으로 결정.
-   - core_engine: 사주 기반 에너지 구조
-   - thinking_style: MBTI 기반 인지/의사결정 패턴 (사고 알고리즘)
-   - instinct_style: 별자리 기반 기질/충동성/속도
-   - motivation_core: 애니어그램 기반 동기/두려움 (욕망 구조, 데이터가 null이면 "분석 제외"로 표시)
-   - weakness_pattern: 인간 구조적 결함/약점 패턴
-   - relationship_pattern: 타인과의 관계 맺기 방식/패턴
-   - compatibility_type: (궁합 요청 시에만 생성) 전략형 커플, 지배형 관계, 보완형 파트너, 소모형 관계 등.
-3. analysis.logic_basis: 핵심 근거 3~4개 (명리학적 구조 기반 짧은 문장)
-4. analysis.good_flow: 좋은 흐름 3개 (짧은 명사형)
-5. analysis.risk_flow: 위험 신호 3개 (짧은 명사형)
-6. analysis.action_now: 지금 액션 3개 (행동 위주 단문)
-7. analysis.avoid_action: 피해야 할 행동 3개 (행동 위주 단문)
-8. analysis.core_analysis: [구조 분석1, 구조 분석2, 마지막 한 줄 경고(강하게)] - 총 3개 고정.
-9. human_type_card: 인간 분석 카드 데이터.
-   - title: "[기본 인간 타입] - [행동 변형]" 형식 (예: 전략형 도전자 - 확장형).
-   - strengths: 강점 3개 (짧고 직관적인 문장).
-   - weaknesses: 약점 3개 (짧고 직관적인 문장).
-   - share_summary: SNS 공유용 한 문장 (예: "나는 전략형 도전자 - 확장형 인간이다. 판을 읽고 움직이는 타입.").
-
-[통합 분석 가이드]
-- 사주(에너지) -> MBTI(사고) -> 별자리(기질) -> 애니어그램(욕망) 순으로 교차 분석한다.
-- 단독 분석 절대 금지. 항상 사주를 엔진으로 두고 나머지를 결합하여 "뾰족하게" 해석하라.
-- 예: "임수는 판을 읽고, ENTP는 구조를 깨며, 양자리는 바로 들이밀고, 7w8은 이기려고 움직인다. 그래서 너는 판단->실행->분석 순으로 움직인다."
+[데이터 생성 규칙]
+- summary.one_liner: 한 줄 직설 요약
+- extended_identity: 사주, MBTI, 별자리, 애니어그램 교차 분석
+- analysis.logic_basis: 3~4개
+- analysis.good_flow: 3개
+- analysis.risk_flow: 3개
+- analysis.action_now: 3개
+- analysis.avoid_action: 3개
+- analysis.core_analysis: 3개
+- human_type_card.title: "[기본 인간 타입] - [행동 변형]"
+- human_type_card.strengths: 3개
+- human_type_card.weaknesses: 3개
+- human_type_card.share_summary: 1개
+- chat_seed_questions: 3~6개
 
 [출력 스키마]
 {
@@ -114,9 +187,26 @@ export async function generateUnifiedSaju(
     "zodiac_korean": "",
     "enneagram": ""
   },
-  "badges": { "ilgan": "", "strength": "", "yongsin": "", "gisin": "", "core_pattern": "" },
-  "pillar": { "year": "", "month": "", "day": "", "hour": "" },
-  "elements": { "wood": 0, "fire": 0, "earth": 0, "metal": 0, "water": 0 },
+  "badges": {
+    "ilgan": "",
+    "strength": "",
+    "yongsin": "",
+    "gisin": "",
+    "core_pattern": ""
+  },
+  "pillar": {
+    "year": "",
+    "month": "",
+    "day": "",
+    "hour": ""
+  },
+  "elements": {
+    "wood": 0,
+    "fire": 0,
+    "earth": 0,
+    "metal": 0,
+    "water": 0
+  },
   "sinsal": [],
   "extended_identity": {
     "human_type": "",
@@ -125,7 +215,8 @@ export async function generateUnifiedSaju(
     "instinct_style": "",
     "motivation_core": "",
     "weakness_pattern": "",
-    "relationship_pattern": ""
+    "relationship_pattern": "",
+    "compatibility_type": ""
   },
   "analysis": {
     "core_analysis": ["", "", ""],
@@ -145,7 +236,7 @@ export async function generateUnifiedSaju(
     "weaknesses": ["", "", ""],
     "share_summary": ""
   },
-  "chat_seed_questions": []
+  "chat_seed_questions": ["", "", ""]
 }`;
 
   const prompt = `사용자 프로필:
@@ -183,39 +274,100 @@ export async function generateSajuReading(
   const category = CATEGORIES.find((c) => c.id === categoryId)?.label || "종합";
 
   const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, '30대 여성 ENTP 무당'입니다.
-당신은 현재 사용자의 "${category}"에 집중하여 분석을 수행합니다.
+현재 사용자의 "${category}"에 집중하여 분석한다.
 
-[페르소나: 30대 ENTP 여성 무당]
-- 논리적, 직설적, 팩트 폭격기.
-- 반말, 단정형, 짧고 리듬감 있는 문장 사용.
-- 분석 -> 구조 -> 결론 순으로 차갑게 통찰.
+[페르소나]
+- 논리적, 직설적, 팩트 폭격기
+- 반말, 단정형, 짧고 리듬감 있는 문장
+- 분석 -> 구조 -> 결론 순
 
-[ABSOLUTE TONE RULE]
-- 설명하지 마라. 장황하게 풀지 마라.
-- 상담사처럼 말하지 마라. 위로 금지.
-- 교훈적 마무리 금지. 설교 금지.
-
-[데이터 생성 및 매핑 규칙]
-- 모든 응답은 UnifiedSajuResult JSON 형식을 따릅니다.
-- "${category}" 테마에 맞춰 모든 분석 텍스트를 생성하십시오.
-- extended_identity는 사주, MBTI, 별자리, 애니어그램을 교차 분석하여 작성하십시오.
-- human_type은 두 단어 구조로 정의하십시오.
-- human_type_card를 생성하십시오. title은 "[기본 인간 타입] - [행동 변형]" 형식이어야 합니다.
+[절대 규칙]
+1. 응답은 오직 단일 JSON만 출력한다.
+2. session_id와 request_id를 그대로 echo 한다.
+3. 마크다운, 이모지, 장식문자 금지.
+4. 누락 필드 금지.
+5. 반드시 아래 스키마를 모두 채운다.
+6. "${category}" 테마 중심으로 summary.one_liner, analysis, chat_seed_questions를 작성한다.
 
 [출력 스키마]
-(generateUnifiedSaju와 동일한 스키마 사용)`;
+{
+  "session_id": "${session_id}",
+  "request_id": "${request_id}",
+  "profile": {
+    "name": "",
+    "birth": "",
+    "calendar": "",
+    "time": "",
+    "ilgan": "",
+    "ilgan_display": "",
+    "mbti": "",
+    "zodiac_korean": "",
+    "enneagram": ""
+  },
+  "badges": {
+    "ilgan": "",
+    "strength": "",
+    "yongsin": "",
+    "gisin": "",
+    "core_pattern": ""
+  },
+  "pillar": {
+    "year": "",
+    "month": "",
+    "day": "",
+    "hour": ""
+  },
+  "elements": {
+    "wood": 0,
+    "fire": 0,
+    "earth": 0,
+    "metal": 0,
+    "water": 0
+  },
+  "sinsal": [],
+  "extended_identity": {
+    "human_type": "",
+    "core_engine": "",
+    "thinking_style": "",
+    "instinct_style": "",
+    "motivation_core": "",
+    "weakness_pattern": "",
+    "relationship_pattern": "",
+    "compatibility_type": ""
+  },
+  "analysis": {
+    "core_analysis": ["", "", ""],
+    "logic_basis": ["", "", "", ""],
+    "good_flow": ["", "", ""],
+    "risk_flow": ["", "", ""],
+    "action_now": ["", "", ""],
+    "avoid_action": ["", "", ""]
+  },
+  "summary": {
+    "tone": "entp_shaman_female_30s",
+    "one_liner": ""
+  },
+  "human_type_card": {
+    "title": "",
+    "strengths": ["", "", ""],
+    "weaknesses": ["", "", ""],
+    "share_summary": ""
+  },
+  "chat_seed_questions": ["", "", ""]
+}`;
 
   const prompt = `사용자 프로필:
 이름: ${profile.name || "익명"}
 성별: ${profile.gender}
 생년월일: ${profile.birthDate} (${profile.calendarType === "solar" ? "양력" : "음력"})
 출생시간: ${profile.timeKnown ? profile.birthTime : "모름"}
+출생지: ${profile.location || "미지정"}
 MBTI: ${profile.mbti || "미지정"}
 별자리: ${profile.zodiac_korean || "미지정"}
 애니어그램: ${profile.enneagram || "null"}
 요청 카테고리: ${category}
 
-위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
+반드시 전체 스키마를 채운 UnifiedSajuResult JSON만 출력하라.`;
 
   return await callGemini<UnifiedSajuResult>({
     prompt,
@@ -232,28 +384,95 @@ export async function chatWithSaju(
 ): Promise<UnifiedSajuResult> {
   const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, '30대 여성 ENTP 무당'입니다.
 
-[페르소나: 30대 ENTP 여성 ENTP 무당]
-- 논리적, 직설적, 팩트 폭격기.
-- 반말, 단정형, 짧고 리듬감 있는 문장 사용.
-- 분석 -> 구조 -> 결론 순으로 차갑게 통찰.
+[페르소나]
+- 논리적, 직설적, 팩트 폭격기
+- 반말, 단정형, 짧고 리듬감 있는 문장
+- 분석 -> 구조 -> 결론 순
 
-[ABSOLUTE TONE RULE]
-- 설명하지 마라. 장황하게 풀지 마라.
-- 상담사처럼 말하지 마라. 위로 금지.
-- 교훈적 마무리 금지. 설교 금지.
+[절대 규칙]
+1. 응답은 오직 단일 JSON만 출력한다.
+2. session_id와 request_id를 그대로 echo 한다.
+3. 누락 필드 금지.
+4. summary.one_liner에 실제 답변의 핵심을 담는다.
+5. chat_seed_questions도 함께 반환한다.
 
-[참고 데이터]
-사용자 프로필: ${JSON.stringify(profile)}
+[출력 스키마]
+{
+  "session_id": "${session_id}",
+  "request_id": "${request_id}",
+  "profile": {
+    "name": "",
+    "birth": "",
+    "calendar": "",
+    "time": "",
+    "ilgan": "",
+    "ilgan_display": "",
+    "mbti": "",
+    "zodiac_korean": "",
+    "enneagram": ""
+  },
+  "badges": {
+    "ilgan": "",
+    "strength": "",
+    "yongsin": "",
+    "gisin": "",
+    "core_pattern": ""
+  },
+  "pillar": {
+    "year": "",
+    "month": "",
+    "day": "",
+    "hour": ""
+  },
+  "elements": {
+    "wood": 0,
+    "fire": 0,
+    "earth": 0,
+    "metal": 0,
+    "water": 0
+  },
+  "sinsal": [],
+  "extended_identity": {
+    "human_type": "",
+    "core_engine": "",
+    "thinking_style": "",
+    "instinct_style": "",
+    "motivation_core": "",
+    "weakness_pattern": "",
+    "relationship_pattern": "",
+    "compatibility_type": ""
+  },
+  "analysis": {
+    "core_analysis": ["", "", ""],
+    "logic_basis": ["", "", "", ""],
+    "good_flow": ["", "", ""],
+    "risk_flow": ["", "", ""],
+    "action_now": ["", "", ""],
+    "avoid_action": ["", "", ""]
+  },
+  "summary": {
+    "tone": "entp_shaman_female_30s",
+    "one_liner": ""
+  },
+  "human_type_card": {
+    "title": "",
+    "strengths": ["", "", ""],
+    "weaknesses": ["", "", ""],
+    "share_summary": ""
+  },
+  "chat_seed_questions": ["", "", ""]
+}`;
 
-[대화 규칙]
-- 사용자의 질문에 대해 사주와 MBTI, 별자리, 애니어그램을 교차 분석하여 답변하십시오.
-- 응답은 반드시 UnifiedSajuResult JSON 형식을 유지하십시오.
-- summary.one_liner에 실제 답변 내용을 담으십시오.
-- human_type_card를 대화 맥락에 맞게 업데이트하거나 유지하십시오.
-- 다른 필드들은 대화 맥락에 따라 업데이트하거나 유지하십시오.`;
+  const prompt = `사용자 프로필:
+${JSON.stringify(profile)}
+
+사용자 질문:
+${userInput}
+
+반드시 전체 스키마를 채운 UnifiedSajuResult JSON만 출력하라.`;
 
   return await callGemini<UnifiedSajuResult>({
-    prompt: userInput,
+    prompt,
     systemInstruction,
     history: history.map((h) => ({
       role: h.role === "user" ? "user" : "model",
