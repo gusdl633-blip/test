@@ -319,11 +319,13 @@ console.log("ONE LINER:", result?.summary?.one_liner);
               exit={{ opacity: 0, x: -20 }}
               className="container mx-auto px-6 py-4"
             >
-              <ChatInterface 
-                profile={profile} 
-                sessionId={sessionId} 
-                initialMessage={initialChatInput} 
-              />
+            <ChatInterface
+  profile={profile}
+  sessionId={sessionId}
+  initialMessage={initialChatInput}
+  summary={summary}
+  reading={reading}
+/>
             </motion.div>
           )}
         </AnimatePresence>
