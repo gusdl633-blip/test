@@ -10,6 +10,7 @@ import SajuSummaryHeader from './components/SajuSummaryHeader';
 import { SajuProfile, UnifiedSajuResult, CATEGORIES, generateSajuReading, generateUnifiedSaju } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from 'lucide-react';
+import ErrorModal from "./components/ErrorModal";
 
 type View = 'onboarding' | 'dashboard' | 'result' | 'chat';
 
