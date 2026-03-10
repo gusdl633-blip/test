@@ -1,4 +1,5 @@
 import type { SajuProfile, UnifiedSajuResult } from "../types";
+import { calculateSajuFromProfile } from "../lib/sajuCalculator";
 export type { SajuProfile, UnifiedSajuResult };
 
 type ChatHistoryItem = { role: string; message: string };
