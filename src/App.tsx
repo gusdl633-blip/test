@@ -112,7 +112,11 @@ const handleCategorySelect = async (categoryId: string) => {
       window.scrollTo({ top: 0, behavior: "smooth" });
 
       const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
-      console.log("CATEGORY RESULT:", result);
+console.log("CATEGORY RESULT:", result);
+console.log("SUMMARY:", result?.summary);
+console.log("ONE LINER:", result?.summary?.one_liner);
+
+setReading(result);
 
       setReading(result);
     } catch (error: any) {
