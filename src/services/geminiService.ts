@@ -13,8 +13,8 @@ async function callGemini<T>(payload: {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
-  });
+   body: JSON.stringify({ prompt, systemInstruction, history }),
+});
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
