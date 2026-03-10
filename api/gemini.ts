@@ -4,6 +4,10 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -32,16 +36,43 @@ export default async function handler(req: any, res: any) {
       },
     ];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents,
-      config: {
-        systemInstruction: systemInstruction || "",
-      },
-    });
+    let lastError: any = null;
 
-    return res.status(200).json({
-      text: response.text ?? "",
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents,
+          config: {
+            systemInstruction: systemInstruction || "",
+          },
+        });
+
+        return res.status(200).json({
+          text: response.text ?? "",
+        });
+      } catch (error: any) {
+        lastError = error;
+
+        const message = error?.message || "";
+        const isRetryable =
+          message.includes("503") ||
+          message.includes("UNAVAILABLE") ||
+          message.includes("high demand");
+
+        if (!isRetryable || attempt === 2) {
+          break;
+        }
+
+        await sleep(1500 * (attempt + 1));
+      }
+    }
+
+    console.error("Gemini request failed:", lastError);
+
+    return res.status(500).json({
+      error: "Gemini request failed",
+      detail: lastError?.message ?? "Unknown error",
     });
   } catch (error: any) {
     console.error("Gemini request failed:", error);
