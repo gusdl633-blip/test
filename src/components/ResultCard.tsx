@@ -28,7 +28,7 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
           {categoryLabel}
         </motion.div>
         <h2 className="text-4xl md:text-5xl font-bold leading-tight tracking-tight text-white">
-          <span className="text-accent">"</span>{reading.summary.one_liner}<span className="text-accent">"</span>
+          <span className="text-accent">"</span>{reading?.summary?.one_liner ?? ""}<span className="text-accent">"</span>
         </h2>
       </div>
 
