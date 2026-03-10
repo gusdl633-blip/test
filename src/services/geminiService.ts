@@ -13,8 +13,12 @@ async function callGemini<T>(payload: {
     headers: {
       "Content-Type": "application/json",
     },
-   body: JSON.stringify({ prompt, systemInstruction, history }),
-});
+    body: JSON.stringify({
+      prompt: payload.prompt,
+      systemInstruction: payload.systemInstruction,
+      history: payload.history ?? [],
+    }),
+  });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
@@ -22,9 +26,20 @@ async function callGemini<T>(payload: {
   }
 
   const data = await res.json();
-  return data as T;
-}
 
+const raw = typeof data?.text === "string" ? data.text : "{}";
+  
+  const cleaned = raw
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleaned) as T;
+}
+const { prompt, systemInstruction, history } = req.body ?? {};
+config: {
+  systemInstruction: systemInstruction || "",
+}
 export async function generateUnifiedSaju(
   profile: SajuProfile,
   session_id: string,
@@ -150,9 +165,13 @@ MBTI: ${profile.mbti || "미지정"}
 위 정보를 바탕으로 UnifiedSajuResult JSON을 생성하라.`;
 
   return await callGemini<UnifiedSajuResult>({
-    prompt,
-    systemInstruction,
-  });
+  prompt: userInput,
+  systemInstruction,
+  history: history.map((h) => ({
+    role: h.role === "user" ? "user" : "model",
+    text: h.message,
+  })),
+});
 }
 
 export const CATEGORIES = [
