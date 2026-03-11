@@ -106,6 +106,7 @@ export async function calculateSajuFromProfile(profile: SajuProfile): Promise<Ca
   }
 
   const data = await res.json();
+  console.log("SAJU API RAW:", data);
 
   const pillar = {
     year: data?.pillar?.year ?? "",
@@ -115,7 +116,7 @@ export async function calculateSajuFromProfile(profile: SajuProfile): Promise<Ca
   };
 
   const dayStem = Array.from(pillar.day)[0] || "";
-
+console.log("SAJU API PARSED PILLAR:", pillar);
   return {
     pillar,
     elements: calcElementsFromPillars(pillar),
