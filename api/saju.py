@@ -26,15 +26,15 @@ class handler(BaseHTTPRequestHandler):
                 utc_offset=9,
             )
 
-            result = {
-                "pillar": {
-                    "year": saju["year_pillar"],
-                    "month": saju["month_pillar"],
-                    "day": saju["day_pillar"],
-                    "hour": saju["hour_pillar"],
-                },
-                "raw": saju,
-            }
+           result = {
+    "pillar": {
+        "year": saju.get("year_pillar", ""),
+        "month": saju.get("month_pillar", ""),
+        "day": saju.get("day_pillar", ""),
+        "hour": saju.get("hour_pillar", ""),
+    },
+    "raw": saju,
+}
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
