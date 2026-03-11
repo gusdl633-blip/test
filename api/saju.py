@@ -1,48 +1,53 @@
-from http.server import BaseHTTPRequestHandler
 import json
 from datetime import datetime
-from sajupy import saju
+from sajupy import calculate_saju
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        try:
-            content_length = int(self.headers['Content-Length'])
-            body = self.rfile.read(content_length)
-            data = json.loads(body)
+def handler(request):
 
-            birth_date = data.get("birthDate")
-            birth_time = data.get("birthTime", "00:00")
+    if request.method != "POST":
+        return {
+            "statusCode": 405,
+            "body": "Method Not Allowed"
+        }
 
-            dt = datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
+    try:
+        data = json.loads(request.body)
 
-            result = saju(
-                year=dt.year,
-                month=dt.month,
-                day=dt.day,
-                hour=dt.hour
-            )
+        birth_date = data.get("birthDate")
+        birth_time = data.get("birthTime", "00:00")
 
-            response = {
-                "pillar": {
-                    "year": result["year_pillar"],
-                    "month": result["month_pillar"],
-                    "day": result["day_pillar"],
-                    "hour": result["hour_pillar"]
-                },
-                "raw": result
+        year, month, day = map(int, birth_date.split("-"))
+        hour, minute = map(int, birth_time.split(":"))
+
+        saju = calculate_saju(
+            year=year,
+            month=month,
+            day=day,
+            hour=hour,
+            minute=minute,
+            city="Seoul",
+            use_solar_time=True,
+            utc_offset=9
+        )
+
+        result = {
+            "pillar": {
+                "year": saju["year_pillar"],
+                "month": saju["month_pillar"],
+                "day": saju["day_pillar"],
+                "hour": saju["hour_pillar"]
             }
+        }
 
-            self.send_response(200)
-            self.send_header('Content-type','application/json')
-            self.end_headers()
+        return {
+            "statusCode": 200,
+            "body": json.dumps(result)
+        }
 
-            self.wfile.write(json.dumps(response).encode())
-
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-type','application/json')
-            self.end_headers()
-
-            self.wfile.write(json.dumps({
+    except Exception as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({
                 "error": str(e)
-            }).encode())
+            })
+        }
