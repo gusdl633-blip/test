@@ -91,18 +91,22 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
   await run();
 };
 
-  const handleProfileSubmit = async (data: SajuProfile) => {
+const handleProfileSubmit = async (data: SajuProfile) => {
   setSummary(null);
   setReading(null);
   setCurrentCategory(null);
   setInitialChatInput("");
-  setErrorMessage(null);
+
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith("saju_cache_")) {
+      localStorage.removeItem(key);
+    }
+  });
 
   setProfile(data);
   localStorage.setItem("saju_profile", JSON.stringify(data));
   window.location.hash = "";
   setView("dashboard");
-
   await fetchSummary(data);
 };
 
@@ -147,25 +151,22 @@ console.log("ONE LINER:", result?.summary?.one_liner);
 };
 
   const resetProfile = () => {
-    if (confirm('모든 정보와 대화 내역이 초기화됩니다. 계속하시겠습니까?')) {
-      // Clear all saju related keys
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('saju_')) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      setProfile(null);
-      setSummary(null);
-      setReading(null);
-      setSessionId(Math.random().toString(36).substring(7));
-      
-      // Redirect to setup with history replace
-      window.location.hash = '#setup';
-      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-      setView('onboarding');
+  if (!confirm("모든 정보와 대화 내역이 초기화됩니다. 계속하시겠습니까?")) return;
+
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith("saju_")) {
+      localStorage.removeItem(key);
     }
-  };
+  });
+
+  setProfile(null);
+  setSummary(null);
+  setReading(null);
+  setCurrentCategory(null);
+  setInitialChatInput("");
+  setView("onboarding");
+  window.location.hash = "#setup";
+};
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
