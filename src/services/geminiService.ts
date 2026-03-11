@@ -287,6 +287,7 @@ export async function generateUnifiedSaju(
   });
 
   const fixed = await calculateSajuFromProfile(profile);
+const aiResult = await callGemini(...);
 
 return mergeFixedSaju(aiResult, fixed, profile, session_id, request_id);
 }
