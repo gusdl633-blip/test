@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { MessageSquare } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { MessageSquare, Send } from "lucide-react";
 import type { SajuProfile, UnifiedSajuResult } from "../services/geminiService";
 import { chatWithSaju } from "../services/geminiService";
 
+type ChatRole = "user" | "assistant";
+
 type ChatMessage = {
-  role: "user" | "assistant";
+  role: ChatRole;
   message: string;
 };
 
-interface Props {
+interface ChatInterfaceProps {
   profile: SajuProfile;
   sessionId: string;
   initialMessage?: string;
@@ -16,31 +18,65 @@ interface Props {
   reading?: UnifiedSajuResult | null;
 }
 
+const QUICK_QUESTIONS = [
+  "연애운 더 깊게",
+  "이직 타이밍",
+  "상대 성향(생일 필요)",
+  "돈 관리법",
+  "이번달 조심할 행동",
+  "딱 한가지 조언만",
+];
+
 export default function ChatInterface({
   profile,
   sessionId,
   initialMessage = "",
   summary = null,
   reading = null,
-}: Props) {
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState(initialMessage);
   const [isLoading, setIsLoading] = useState(false);
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const didAutoSendRef = useRef(false);
+
+  const seedQuestions = useMemo(() => {
+    const fromSummary = summary?.chat_seed_questions ?? [];
+    const fromReading = reading?.chat_seed_questions ?? [];
+    return [...fromReading, ...fromSummary].filter(Boolean).slice(0, 6);
+  }, [summary, reading]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
   useEffect(() => {
     setInput(initialMessage || "");
+    if (initialMessage?.trim()) {
+      didAutoSendRef.current = false;
+    }
   }, [initialMessage]);
 
   useEffect(() => {
     if (!initialMessage?.trim()) return;
-    if (messages.length > 0) return;
+    if (didAutoSendRef.current) return;
+    if (isLoading) return;
 
+    didAutoSendRef.current = true;
     void handleSend(initialMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage]);
+  }, [initialMessage, isLoading]);
 
-  const handleSend = async (overrideText?: string) => {
-    const text = (overrideText ?? input).trim();
+  const handleQuickQuestion = async (question: string) => {
+    if (isLoading) return;
+    setInput(question);
+    await handleSend(question);
+  };
+
+  const handleSend = async (forcedMessage?: string) => {
+    const text = (forcedMessage ?? input).trim();
     if (!text || isLoading) return;
 
     const userMessage: ChatMessage = {
@@ -54,13 +90,25 @@ export default function ChatInterface({
     setIsLoading(true);
 
     try {
-      const requestId = Math.random().toString(36).substring(7);
+      const requestId = Math.random().toString(36).substring(2, 10);
 
-      const result = await chatWithSaju(profile, history, input, sessionId, requestId);
+      const result = await chatWithSaju(
+        profile,
+        nextMessages.map((m) => ({
+          role: m.role,
+          message: m.message,
+        })),
+        text,
+        sessionId,
+        requestId,
+        summary,
+        reading
+      );
 
       const assistantText =
         result?.summary?.one_liner ||
         result?.analysis?.core_analysis?.[0] ||
+        result?.analysis?.logic_basis?.[0] ||
         "지금 답변을 정리 중이다.";
 
       setMessages((prev) => [
@@ -77,12 +125,18 @@ export default function ChatInterface({
         ...prev,
         {
           role: "assistant",
-          message: "지금 상담 엔진 연결이 불안정하다. 잠깐 뒤 다시 쳐.",
+          message: "지금 상담 엔진 연결이 불안정하다. 잠깐 뒤 다시와.",
         },
       ]);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSend();
   };
 
   return (
@@ -95,72 +149,82 @@ export default function ChatInterface({
           </div>
         </div>
 
-        <div className="min-h-[520px] px-8 py-8 space-y-6">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={
-                  msg.role === "user"
-                    ? "max-w-[70%] px-6 py-5 rounded-[24px] border border-neon-primary/40 bg-neon-primary/10 text-neon-primary"
-                    : "max-w-[70%] px-6 py-5 rounded-[24px] border border-neon-secondary/20 bg-white/5 text-white"
-                }
-              >
-                {msg.message}
-              </div>
+        <div className="min-h-[520px] px-6 py-8 space-y-6">
+          {messages.length === 0 && !isLoading && (
+            <div className="text-sm text-text-sub/70">
+              궁금한 걸 바로 물어봐. 애매하게 말해도 되지만, 질문이 구체적일수록 답도 날카로워진다.
             </div>
-          ))}
+          )}
+
+          {messages.map((msg, index) => {
+            const isUser = msg.role === "user";
+            return (
+              <div
+                key={`${msg.role}-${index}-${msg.message.slice(0, 20)}`}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={[
+                    "max-w-[82%] rounded-[28px] px-6 py-5 text-[15px] leading-8 whitespace-pre-wrap break-words",
+                    isUser
+                      ? "bg-neon-primary/10 border border-neon-primary/35 text-neon-primary"
+                      : "bg-white/5 border border-white/12 text-white",
+                  ].join(" ")}
+                >
+                  {msg.message}
+                </div>
+              </div>
+            );
+          })}
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="max-w-[70%] px-6 py-5 rounded-[24px] border border-neon-secondary/20 bg-white/5 text-text-sub">
-                답변 정리 중이다...
+              <div className="max-w-[82%] rounded-[28px] px-6 py-5 bg-white/5 border border-white/12 text-white">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-white/60 animate-pulse" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-white/60 animate-pulse [animation-delay:150ms]" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-white/60 animate-pulse [animation-delay:300ms]" />
+                </div>
               </div>
             </div>
           )}
+
+          <div ref={bottomRef} />
         </div>
 
         <div className="border-t border-white/10 px-6 py-5 space-y-4">
           <div className="flex flex-wrap gap-2">
-            {[
-              "연애운 더 깊게",
-              "이직 타이밍",
-              "상대 성향(생일 필요)",
-              "돈 관리법",
-              "이번달 조심할 행동",
-              "딱 한가지 조언만",
-            ].map((q, i) => (
+            {(seedQuestions.length > 0 ? seedQuestions : QUICK_QUESTIONS).map((q, i) => (
               <button
-                key={i}
-                onClick={() => void handleSend(q)}
-                className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-text-sub hover:text-white hover:border-neon-secondary/40 transition"
+                key={`${q}-${i}`}
+                type="button"
+                onClick={() => void handleQuickQuestion(q)}
+                disabled={isLoading}
+                className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-full transition-all text-text-main/80 disabled:opacity-50"
               >
                 {q}
               </button>
             ))}
           </div>
 
-          <div className="flex gap-3">
+          <form onSubmit={handleSubmit} className="flex items-center gap-3">
             <input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  void handleSend();
-                }
-              }}
               placeholder="상담 내용을 입력하세요..."
-              className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 px-5 text-white outline-none"
+              disabled={isLoading}
+              className="flex-1 h-14 rounded-[18px] bg-white/5 border border-white/10 px-5 text-white placeholder:text-text-sub/45 outline-none focus:border-neon-secondary/40 disabled:opacity-50"
             />
             <button
-              onClick={() => void handleSend()}
-              className="w-16 h-14 rounded-2xl bg-neon-secondary text-black font-bold"
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="h-14 px-6 rounded-[18px] bg-neon-secondary text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
+              <Send className="w-4 h-4 mr-2" />
               전송
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>
