@@ -19,18 +19,18 @@
   ],
   "routes": [
     {
-      "src": "/api/saju",
+      "src": "^/api/saju$",
       "dest": "/api/saju.py"
     },
     {
-      "src": "/api/gemini",
+      "src": "^/api/gemini$",
       "dest": "/api/gemini.ts"
     },
     {
       "handle": "filesystem"
     },
     {
-      "src": "/(.*)",
+      "src": "^(?!/api).*$",
       "dest": "/"
     }
   ]
