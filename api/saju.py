@@ -3,31 +3,23 @@ import json
 from engine.calculator import calculate_engine_saju
 
 class handler(BaseHTTPRequestHandler):
+    def _send_json(self, status_code: int, data: dict):
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+
+    def do_GET(self):
+        self._send_json(405, {"error": "Method Not Allowed"})
+
     def do_POST(self):
         try:
             content_length = int(self.headers.get("Content-Length", 0))
-            raw_body = self.rfile.read(content_length)
-            body = json.loads(raw_body.decode("utf-8"))
+            raw_body = self.rfile.read(content_length).decode("utf-8")
+            body = json.loads(raw_body) if raw_body else {}
 
             result = calculate_engine_saju(body)
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+            self._send_json(200, result)
 
         except Exception as e:
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(
-                json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8")
-            )
-
-    def do_GET(self):
-        self.send_response(405)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(
-            json.dumps({"error": "Method Not Allowed"}, ensure_ascii=False).encode("utf-8")
-        )
+            self._send_json(500, {"error": str(e)})
