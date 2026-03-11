@@ -52,16 +52,18 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
- const fetchSummary = async (p: SajuProfile) => {
+const fetchSummary = async (p: SajuProfile, customSessionId?: string) => {
   const run = async () => {
     const requestId = Math.random().toString(36).substring(7);
+    const activeSessionId = customSessionId || sessionId;
+
     const profileKey = `${p.birthDate}|${p.birthTime || "00:00"}|${p.calendarType}|${p.location || "none"}|${p.gender}`;
 
     try {
       setErrorMessage(null);
       setIsLoading(true);
 
-      const data = await generateUnifiedSaju(p, sessionId, requestId);
+      const data = await generateUnifiedSaju(p, activeSessionId, requestId);
       setSummary(data);
       localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
     } catch (e: any) {
@@ -77,18 +79,26 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
 };
 
 const handleProfileSubmit = async (data: SajuProfile) => {
+  // 이전 사람 데이터 즉시 제거
   setSummary(null);
   setReading(null);
   setCurrentCategory(null);
   setInitialChatInput("");
   setErrorMessage(null);
+  setRetryAction(null);
 
+  // 세션도 새로
+  const newSessionId = Math.random().toString(36).substring(7);
+  setSessionId(newSessionId);
+
+  // 프로필 저장
   setProfile(data);
   localStorage.setItem("saju_profile", JSON.stringify(data));
+
   window.location.hash = "";
   setView("dashboard");
 
-  await fetchSummary(data);
+  await fetchSummary(data, newSessionId);
 };
 
 const handleCategorySelect = async (categoryId: string) => {
@@ -225,9 +235,15 @@ const handleCategorySelect = async (categoryId: string) => {
               exit={{ opacity: 0 }}
               className="flex flex-col"
             >
-              <SajuSummaryHeader 
-                data={summary || undefined} 
-              />
+              <SajuSummaryHeader
+  key={`${profile?.birthDate || "none"}-${profile?.birthTime || "none"}-${profile?.gender || "none"}`}
+  data={
+    summary &&
+    summary.profile?.birth === profile?.birthDate
+      ? summary
+      : undefined
+  }
+/>
               
               <div className="container mx-auto px-6 py-4 space-y-12">
                 <div className="text-center space-y-4">
