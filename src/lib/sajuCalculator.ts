@@ -27,7 +27,7 @@ export type CalculatedSaju = {
   raw?: any;
 };
 
-function buildFallbackIlangan(dayPillar: string) {
+function fallbackIlangan(dayPillar: string) {
   const stem = dayPillar?.[0] || "";
   const map: Record<string, string> = {
     갑: "갑목",
@@ -54,10 +54,10 @@ export async function calculateSajuFromProfile(
     },
     body: JSON.stringify({
       name: profile.name || "",
-      gender: profile.gender,
-      birthDate: profile.birthDate,
+      gender: profile.gender || "",
+      birthDate: profile.birthDate || "",
       birthTime: profile.timeKnown ? profile.birthTime : "00:00",
-      calendarType: profile.calendarType,
+      calendarType: profile.calendarType || "solar",
       location: profile.location || "Seoul",
       mbti: profile.mbti || "",
       zodiac_korean: profile.zodiac_korean || "",
@@ -79,7 +79,7 @@ export async function calculateSajuFromProfile(
     hour: data?.pillar?.hour ?? "",
   };
 
-  const fallbackIlangan = buildFallbackIlangan(pillar.day);
+  const ilganFallback = fallbackIlangan(pillar.day);
 
   return {
     pillar,
@@ -90,11 +90,11 @@ export async function calculateSajuFromProfile(
       metal: data?.elements?.metal ?? 0,
       water: data?.elements?.water ?? 0,
     },
-    ilgan: data?.profile?.ilgan ?? fallbackIlangan,
-    ilgan_display: data?.profile?.ilgan_display ?? `${fallbackIlangan} 일간`,
+    ilgan: data?.profile?.ilgan ?? ilganFallback,
+    ilgan_display: data?.profile?.ilgan_display ?? `${ilganFallback} 일간`,
     sinsal: data?.sinsal ?? [],
     badges: {
-      ilgan: data?.badges?.ilgan ?? fallbackIlangan,
+      ilgan: data?.badges?.ilgan ?? ilganFallback,
       strength: data?.badges?.strength ?? "",
       yongsin: data?.badges?.yongsin ?? "",
       gisin: data?.badges?.gisin ?? "",
