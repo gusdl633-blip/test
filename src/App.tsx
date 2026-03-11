@@ -15,8 +15,8 @@ export default function App() {
 const [view, setView] = useState<View>("onboarding");
 const [profile, setProfile] = useState<SajuProfile | null>(null);
 const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
-const [currentCategory, setCurrentCategory] = useState<string | null>(null);
 const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
+const [currentCategory, setCurrentCategory] = useState<string | null>(null);
 
 const [isLoading, setIsLoading] = useState(false);
 const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -54,23 +54,8 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
 
  const fetchSummary = async (p: SajuProfile) => {
   const run = async () => {
-    setSummary(null);
-
     const requestId = Math.random().toString(36).substring(7);
     const profileKey = `${p.birthDate}|${p.birthTime || "00:00"}|${p.calendarType}|${p.location || "none"}|${p.gender}`;
-   // const cached = localStorage.getItem(`saju_cache_${profileKey}`);
-
-// if (cached) {
-//   try {
-//     const parsed = JSON.parse(cached);
-//     if (parsed.session_id && parsed.pillar) {
-//       setSummary(parsed);
-//       return;
-//     }
-//   } catch (e) {
-//     console.error("Failed to parse cached summary:", e);
-//   }
-// }
 
     try {
       setErrorMessage(null);
@@ -78,7 +63,7 @@ const [initialChatInput, setInitialChatInput] = useState<string>("");
 
       const data = await generateUnifiedSaju(p, sessionId, requestId);
       setSummary(data);
-      // localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
+      localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
     } catch (e: any) {
       console.error("Failed to fetch summary:", e);
       setErrorMessage("기본 사주 요약을 불러오지 못했다.\n잠시 후 다시 시도해라.");
@@ -97,15 +82,6 @@ const handleProfileSubmit = async (data: SajuProfile) => {
   setCurrentCategory(null);
   setInitialChatInput("");
   setErrorMessage(null);
-
-  Object.keys(localStorage).forEach((key) => {
-    if (
-      key.startsWith("saju_cache_") ||
-      key === "saju_profile"
-    ) {
-      localStorage.removeItem(key);
-    }
-  });
 
   setProfile(data);
   localStorage.setItem("saju_profile", JSON.stringify(data));
@@ -130,10 +106,6 @@ const handleCategorySelect = async (categoryId: string) => {
       window.scrollTo({ top: 0, behavior: "smooth" });
 
       const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
-console.log("CATEGORY RESULT:", result);
-console.log("SUMMARY:", result?.summary);
-console.log("ONE LINER:", result?.summary?.one_liner);
-
       setReading(result);
     } catch (error: any) {
       console.error("generateSajuReading failed:", error);
@@ -169,6 +141,10 @@ console.log("ONE LINER:", result?.summary?.one_liner);
   setReading(null);
   setCurrentCategory(null);
   setInitialChatInput("");
+  setErrorMessage(null);
+  setRetryAction(null);
+  setSessionId(Math.random().toString(36).substring(7));
+
   setView("onboarding");
   window.location.hash = "#setup";
 };
