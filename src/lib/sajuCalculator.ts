@@ -26,14 +26,48 @@ export type CalculatedSaju = {
   };
 };
 
-function mapStemOrBranchToElement(char: string): "wood" | "fire" | "earth" | "metal" | "water" | null {
+function mapStemOrBranchToElement(
+  char: string
+): "wood" | "fire" | "earth" | "metal" | "water" | null {
   const table: Record<string, "wood" | "fire" | "earth" | "metal" | "water"> = {
-    갑: "wood", 을: "wood", 寅: "wood", 인: "wood", 卯: "wood", 묘: "wood",
-    병: "fire", 정: "fire", 巳: "fire", 사: "fire", 午: "fire", 오: "fire",
-    무: "earth", 기: "earth", 辰: "earth", 진: "earth", 戌: "earth", 술: "earth", 丑: "earth", 축: "earth", 未: "earth", 미: "earth",
-    경: "metal", 신: "metal", 申: "metal", 신: "metal", 酉: "metal", 유: "metal",
-    임: "water", 계: "water", 子: "water", 자: "water", 亥: "water", 해: "water",
+    // 천간 한글 + 한자
+    갑: "wood",
+    을: "wood",
+    병: "fire",
+    정: "fire",
+    무: "earth",
+    기: "earth",
+    경: "metal",
+    신: "metal",
+    임: "water",
+    계: "water",
+
+    甲: "wood",
+    乙: "wood",
+    丙: "fire",
+    丁: "fire",
+    戊: "earth",
+    己: "earth",
+    庚: "metal",
+    辛: "metal",
+    壬: "water",
+    癸: "water",
+
+    // 지지 한자만 유지
+    寅: "wood",
+    卯: "wood",
+    巳: "fire",
+    午: "fire",
+    辰: "earth",
+    戌: "earth",
+    丑: "earth",
+    未: "earth",
+    申: "metal",
+    酉: "metal",
+    子: "water",
+    亥: "water",
   };
+
   return table[char] ?? null;
 }
 
