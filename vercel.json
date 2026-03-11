@@ -1,10 +1,7 @@
 {
   "functions": {
-    "api/gemini.ts": {
-      "runtime": "nodejs24.x"
-    },
-    "api/saju.py": {
-      "runtime": "python3.12"
+    "api/**/*.py": {
+      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,fixtures/**,__fixtures__/**,testdata/**,sample-data/**,static/**,assets/**}"
     }
   }
 }
