@@ -85,39 +85,32 @@ function normalizeUnifiedSajuResult(data: any): UnifiedSajuResult {
   };
 }
 
-function mergeFixedSaju(
-  aiData: any,
-  profile: SajuProfile,
-  session_id: string,
-  request_id: string
-): UnifiedSajuResult {
-  const fixed = calculateSajuFromProfile(profile);
-
-  const normalized = normalizeUnifiedSajuResult(aiData);
+function mergeFixedSaju(aiData, fixed, profile, session_id, request_id) {
 
   return {
-    ...normalized,
-    session_id,
-    request_id,
+  ...aiData,
 
-    profile: {
-      ...normalized.profile,
-      name: profile.name || "",
-      birth: profile.birthDate || "",
-      calendar: profile.calendarType || "",
-      time: profile.birthTime || "",
-      ilgan: fixed.ilgan,
-      ilgan_display: fixed.ilgan_display,
-      mbti: profile.mbti || "",
-      zodiac_korean: profile.zodiac_korean || "",
-      enneagram: profile.enneagram || "",
-    },
+  pillar: fixed.pillar,
+  elements: fixed.elements,
+  sinsal: fixed.sinsal,
+  badges: fixed.badges,
 
-    badges: fixed.badges,
-    pillar: fixed.pillar,
-    elements: fixed.elements,
-    sinsal: fixed.sinsal,
-  };
+  profile: {
+    ...aiData.profile,
+    name: profile.name || "",
+    birth: profile.birthDate || "",
+    calendar: profile.calendarType || "",
+    time: profile.birthTime || "",
+    ilgan: fixed.ilgan,
+    ilgan_display: fixed.ilgan_display,
+    mbti: profile.mbti || "",
+    zodiac_korean: profile.zodiac_korean || "",
+    enneagram: profile.enneagram || "",
+  },
+
+  session_id,
+  request_id,
+};
 }
 
 async function callGemini<T>(payload: {
@@ -293,7 +286,9 @@ export async function generateUnifiedSaju(
     systemInstruction,
   });
 
-  return mergeFixedSaju(aiResult, profile, session_id, request_id);
+  const fixed = await calculateSajuFromProfile(profile);
+
+return mergeFixedSaju(aiResult, fixed, profile, session_id, request_id);
 }
 
 export const CATEGORIES = [
