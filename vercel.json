@@ -1,37 +1,10 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/gemini.ts": {
+      "runtime": "nodejs24.x"
     },
-    {
-      "src": "api/**/*.ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+    "api/saju.py": {
+      "runtime": "python3.12"
     }
-  ],
-  "routes": [
-    {
-      "src": "^/api/saju$",
-      "dest": "/api/saju.py"
-    },
-    {
-      "src": "^/api/gemini$",
-      "dest": "/api/gemini.ts"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "^(?!/api).*$",
-      "dest": "/"
-    }
-  ]
+  }
 }
