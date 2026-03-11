@@ -1,53 +1,48 @@
 from http.server import BaseHTTPRequestHandler
 import json
-from sajupy import calculate_saju
+from datetime import datetime
+from sajupy import saju
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+            data = json.loads(body)
 
-            birth_date = body["birthDate"]
-            birth_time = body.get("birthTime", "00:00")
-            location = body.get("location", "Seoul")
+            birth_date = data.get("birthDate")
+            birth_time = data.get("birthTime", "00:00")
 
-            year, month, day = map(int, birth_date.split("-"))
-            hour, minute = map(int, birth_time.split(":"))
+            dt = datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
 
-            saju = calculate_saju(
-                year=year,
-                month=month,
-                day=day,
-                hour=hour,
-                minute=minute,
-                city=location,
-                use_solar_time=True,
-                utc_offset=9,
+            result = saju(
+                year=dt.year,
+                month=dt.month,
+                day=dt.day,
+                hour=dt.hour
             )
 
-           result = {
-    "pillar": {
-        "year": saju.get("year_pillar", ""),
-        "month": saju.get("month_pillar", ""),
-        "day": saju.get("day_pillar", ""),
-        "hour": saju.get("hour_pillar", ""),
-    },
-    "raw": saju,
-}
+            response = {
+                "pillar": {
+                    "year": result["year_pillar"],
+                    "month": result["month_pillar"],
+                    "day": result["day_pillar"],
+                    "hour": result["hour_pillar"]
+                },
+                "raw": result
+            }
 
             self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header('Content-type','application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+
+            self.wfile.write(json.dumps(response).encode())
 
         except Exception as e:
             self.send_response(500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header('Content-type','application/json')
             self.end_headers()
-            self.wfile.write(
-                json.dumps(
-                    {"error": "saju calculation failed", "detail": str(e)},
-                    ensure_ascii=False,
-                ).encode("utf-8")
-            )
+
+            self.wfile.write(json.dumps({
+                "error": str(e)
+            }).encode())
