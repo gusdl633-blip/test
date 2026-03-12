@@ -1,28 +1,43 @@
-import sys
-import os
 from http.server import BaseHTTPRequestHandler
 import json
 
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+try:
+    from engine.calculator import calculate_engine_saju
+except Exception as e:
+    calculate_engine_saju = None
+    IMPORT_ERROR = str(e)
 
-from engine.calculator import calculate_engine_saju
 
 class handler(BaseHTTPRequestHandler):
-    def _send_json(self, status_code: int, data: dict):
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+
+    def _send(self, status, data):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        self.wfile.write(json.dumps(data).encode())
 
     def do_GET(self):
-        self._send_json(200, {"ok": True, "message": "import success"})
+
+        if calculate_engine_saju is None:
+            self._send(500, {"error": IMPORT_ERROR})
+            return
+
+        self._send(200, {"message": "saju api alive"})
 
     def do_POST(self):
+
+        if calculate_engine_saju is None:
+            self._send(500, {"error": IMPORT_ERROR})
+            return
+
         try:
-            content_length = int(self.headers.get("Content-Length", 0))
-            raw_body = self.rfile.read(content_length).decode("utf-8")
-            body = json.loads(raw_body) if raw_body else {}
-            result = calculate_engine_saju(body)
-            self._send_json(200, result)
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode()
+            payload = json.loads(body)
+
+            result = calculate_engine_saju(payload)
+
+            self._send(200, result)
+
         except Exception as e:
-            self._send_json(500, {"error": str(e)})
+            self._send(500, {"error": str(e)})
