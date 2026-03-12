@@ -19,14 +19,23 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if calculate_engine_saju is None:
-            self._send(500, {"error": IMPORT_ERROR or "calculator import failed"})
+            self._send(500, {
+                "ok": False,
+                "error": IMPORT_ERROR or "calculator import failed"
+            })
             return
 
-        self._send(200, {"message": "saju api alive"})
+        self._send(200, {
+            "ok": True,
+            "message": "saju api alive"
+        })
 
     def do_POST(self):
         if calculate_engine_saju is None:
-            self._send(500, {"error": IMPORT_ERROR or "calculator import failed"})
+            self._send(500, {
+                "ok": False,
+                "error": IMPORT_ERROR or "calculator import failed"
+            })
             return
 
         try:
@@ -35,7 +44,11 @@ class handler(BaseHTTPRequestHandler):
             payload = json.loads(raw_body) if raw_body else {}
 
             result = calculate_engine_saju(payload)
+
             self._send(200, result)
 
         except Exception as e:
-            self._send(500, {"error": str(e)})
+            self._send(500, {
+                "ok": False,
+                "error": str(e)
+            })
