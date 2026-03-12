@@ -1,11 +1,7 @@
-from datetime import datetime
-
 try:
     from sajupy import calculate_saju
-    SAJUPY_IMPORT_ERROR = None
-except Exception as e:
+except Exception:
     calculate_saju = None
-    SAJUPY_IMPORT_ERROR = str(e)
 
 from .elements import build_elements
 from .ten_gods import (
@@ -31,87 +27,28 @@ def fallback_known_case(birth_date: str, birth_time: str):
     return None
 
 
-def safe_birth_time(value):
-    if not value or not isinstance(value, str):
-        return "00:00"
-
-    value = value.strip()
-    if not value:
-        return "00:00"
-
-    if ":" not in value:
-        return "00:00"
-
-    hh, mm = value.split(":", 1)
-
-    try:
-        hour = max(0, min(23, int(hh)))
-        minute = max(0, min(59, int(mm)))
-        return f"{hour:02d}:{minute:02d}"
-    except Exception:
-        return "00:00"
-
-
-def parse_birth_date(birth_date: str):
-    if not birth_date or not isinstance(birth_date, str):
-        raise ValueError("birthDate missing")
-
-    birth_date = birth_date.strip()
-
-    try:
-        year, month, day = map(int, birth_date.split("-"))
-        datetime(year, month, day)
-        return year, month, day
-    except Exception:
-        raise ValueError(f"invalid birthDate format: {birth_date}")
-
-
 def calculate_base_pillars(birth_date: str, birth_time: str):
-    birth_time = safe_birth_time(birth_time)
     hour, minute = map(int, birth_time.split(":"))
-    year, month, day = parse_birth_date(birth_date)
+    year, month, day = map(int, birth_date.split("-"))
 
     if calculate_saju:
-        try:
-            result = calculate_saju(
-                year=year,
-                month=month,
-                day=day,
-                hour=hour,
-                minute=minute,
-                city="Seoul",
-                use_solar_time=True,
-                utc_offset=9,
-            )
+        result = calculate_saju(
+            year=year,
+            month=month,
+            day=day,
+            hour=hour,
+            minute=minute,
+            city="Seoul",
+            use_solar_time=True,
+            utc_offset=9,
+        )
 
-            if not isinstance(result, dict):
-                raise RuntimeError(f"calculate_saju returned non-dict: {type(result)}")
-
-            year_pillar = result.get("year_pillar")
-            month_pillar = result.get("month_pillar")
-            day_pillar = result.get("day_pillar")
-            hour_pillar = result.get("hour_pillar")
-
-            if not all([year_pillar, month_pillar, day_pillar, hour_pillar]):
-                raise RuntimeError(f"calculate_saju returned incomplete pillars: {result}")
-
-            return {
-                "year": year_pillar,
-                "month": month_pillar,
-                "day": day_pillar,
-                "hour": hour_pillar,
-            }
-
-        except Exception as e:
-            fb = fallback_known_case(birth_date, birth_time)
-            if fb:
-                return {
-                    "year": fb["year_pillar"],
-                    "month": fb["month_pillar"],
-                    "day": fb["day_pillar"],
-                    "hour": fb["hour_pillar"],
-                }
-            raise RuntimeError(f"calculate_saju failed: {str(e)}")
+        return {
+            "year": result["year_pillar"],
+            "month": result["month_pillar"],
+            "day": result["day_pillar"],
+            "hour": result["hour_pillar"],
+        }
 
     fb = fallback_known_case(birth_date, birth_time)
     if fb:
@@ -122,22 +59,13 @@ def calculate_base_pillars(birth_date: str, birth_time: str):
             "hour": fb["hour_pillar"],
         }
 
-    if SAJUPY_IMPORT_ERROR:
-        raise RuntimeError(f"calculate_saju import failed: {SAJUPY_IMPORT_ERROR}")
-
     raise RuntimeError("calculate_saju is unavailable and no fallback matched")
 
 
 def calculate_engine_saju(payload: dict):
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be dict")
-
     birth_date = payload.get("birthDate")
-    birth_time = safe_birth_time(payload.get("birthTime", "00:00"))
+    birth_time = payload.get("birthTime", "00:00")
     gender = payload.get("gender", "")
-
-    if not birth_date:
-        raise ValueError("birthDate missing")
 
     profile = {
         "name": payload.get("name", ""),
@@ -154,14 +82,15 @@ def calculate_engine_saju(payload: dict):
     pillar = calculate_base_pillars(birth_date, birth_time)
 
     elements_bundle = build_elements(pillar)
-    surface_elements = elements_bundle.get("surface", {})
-    hidden_elements = elements_bundle.get("hidden", {})
+    surface_elements = elements_bundle["surface"]
+    hidden_elements = elements_bundle["hidden"]
 
     ten_gods_visible = build_ten_gods_for_visible_stems(pillar)
     ten_gods_hidden = build_hidden_ten_gods(pillar)
+
     ten_gods = {
-        **(ten_gods_visible or {}),
-        **(ten_gods_hidden or {}),
+        **ten_gods_visible,
+        **ten_gods_hidden,
     }
 
     strength_meta = build_strength(pillar)
