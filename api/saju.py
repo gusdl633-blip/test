@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from engine.calculator import calculate_engine_saju
 
+
 class handler(BaseHTTPRequestHandler):
     def _send_json(self, status_code: int, data: dict):
         self.send_response(status_code)
@@ -15,7 +16,7 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
 
     def do_GET(self):
-        self._send_json(200, {"ok": True, "message": "import success"})
+        self._send_json(405, {"error": "Method Not Allowed"})
 
     def do_POST(self):
         try:
