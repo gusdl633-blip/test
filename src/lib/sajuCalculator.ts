@@ -65,12 +65,18 @@ export async function calculateSajuFromProfile(
     }),
   });
 
-  const data = await res.json().catch(() => ({}));
-  console.log("SAJU API RAW:", data);
+const data = await res.json().catch(() => ({}));
+console.log("SAJU API RAW:", data);
 
-  if (!res.ok) {
-    throw new Error(data?.error || "saju calculation failed");
-  }
+if (!res.ok) {
+  console.error("SAJU API ERROR BODY:", data);
+  throw new Error(
+    data?.detail ||
+    data?.error ||
+    JSON.stringify(data) ||
+    "saju calculation failed"
+  );
+}
 
   const pillar = {
     year: data?.pillar?.year ?? "",
