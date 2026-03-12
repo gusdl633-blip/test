@@ -1,12 +1,21 @@
 def calculate_engine_saju(payload: dict):
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be dict")
+
+    birth_date = payload.get("birthDate", "")
+    birth_time = payload.get("birthTime", "00:00")
+    gender = payload.get("gender", "")
+    calendar_type = payload.get("calendarType", "solar")
+    location = payload.get("location", "Seoul")
+
     return {
         "profile": {
             "name": payload.get("name", ""),
-            "birth": payload.get("birthDate", ""),
-            "time": payload.get("birthTime", "00:00"),
-            "calendar": payload.get("calendarType", "solar"),
-            "gender": payload.get("gender", ""),
-            "location": payload.get("location", "Seoul"),
+            "birth": birth_date,
+            "time": birth_time,
+            "calendar": calendar_type,
+            "gender": gender,
+            "location": location,
             "mbti": payload.get("mbti", ""),
             "zodiac_korean": payload.get("zodiac_korean", ""),
             "enneagram": payload.get("enneagram", ""),
