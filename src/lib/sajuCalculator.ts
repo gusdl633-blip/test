@@ -65,11 +65,23 @@ export async function calculateSajuFromProfile(
     }),
   });
 
-const data = await res.json().catch(() => ({}));
+const text = await res.text();
+console.log("SAJU API TEXT RAW:", text);
+
+let data: any = {};
+try {
+  data = text ? JSON.parse(text) : {};
+} catch (e) {
+  console.error("SAJU API JSON PARSE FAILED:", e);
+  throw new Error(text || "saju calculation failed");
+}
+
 console.log("SAJU API RAW:", data);
 
 if (!res.ok) {
-  console.error("SAJU API ERROR BODY:", data);
+  console.error("SAJU API ERROR BODY RAW:", JSON.stringify(data, null, 2));
+  console.error("SAJU API ERROR BODY OBJECT:", data);
+
   throw new Error(
     data?.detail ||
     data?.error ||
