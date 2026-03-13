@@ -45,7 +45,10 @@ class handler(BaseHTTPRequestHandler):
 
             result = calculate_engine_saju(payload)
 
-            self._send(200, result)
+            self._send(200, {
+                "ok": True,
+                **result
+            })
 
         except Exception as e:
             self._send(500, {
