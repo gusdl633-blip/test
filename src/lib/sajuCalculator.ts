@@ -86,7 +86,7 @@ export async function calculateSajuFromProfile(
 
   console.log("SAJU API RAW:", data);
 
-  if (!res.ok || data?.ok === False) {
+  if (!res.ok || data?.ok === false) {
     console.error("SAJU API ERROR BODY RAW:", JSON.stringify(data, null, 2));
     console.error("SAJU API ERROR BODY OBJECT:", data);
 
