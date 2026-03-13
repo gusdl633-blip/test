@@ -83,12 +83,34 @@ DAYMASTER_STRENGTH_MONTH_SUPPORT = {
     "water": {"해", "자", "신", "유"},
 }
 
+
+
 SIMPLE_SINSAL = {
     "문창귀인": {"갑": ["사"], "을": ["오"], "병": ["신"], "정": ["유"], "무": ["신"], "기": ["유"], "경": ["해"], "신": ["자"], "임": ["인"], "계": ["묘"]},
     "역마살": {"인": ["신"], "오": ["신"], "술": ["신"], "신": ["인"], "자": ["인"], "진": ["인"], "사": ["해"], "유": ["해"], "축": ["해"], "해": ["사"], "묘": ["사"], "미": ["사"]},
     "장성살": {"인": ["묘"], "오": ["오"], "술": ["유"], "신": ["유"], "자": ["자"], "진": ["묘"], "사": ["오"], "유": ["유"], "축": ["자"], "해": ["자"], "묘": ["묘"], "미": ["오"]},
     "년살": {"인": ["축"], "오": ["사"], "술": ["유"], "신": ["미"], "자": ["해"], "진": ["묘"], "사": ["진"], "유": ["신"], "축": ["자"], "해": ["술"], "묘": ["인"], "미": ["오"]},
 }
+
+STEM_ALIAS = {
+    "甲": "갑", "乙": "을",
+    "丙": "병", "丁": "정",
+    "戊": "무", "己": "기",
+    "庚": "경", "辛": "신",
+    "壬": "임", "癸": "계",
+}
+
+BRANCH_ALIAS = {
+    "子": "자", "丑": "축", "寅": "인", "卯": "묘",
+    "辰": "진", "巳": "사", "午": "오", "未": "미",
+    "申": "신", "酉": "유", "戌": "술", "亥": "해",
+}
+
+def normalize_stem(stem: str):
+    return STEM_ALIAS.get(stem, stem)
+
+def normalize_branch(branch: str):
+    return BRANCH_ALIAS.get(branch, branch)
 
 def normalize_time(value):
     if not value or not isinstance(value, str):
@@ -107,7 +129,11 @@ def normalize_time(value):
 def split_pillar(pillar: str):
     if not pillar or len(pillar) < 2:
         raise ValueError(f"invalid pillar: {pillar}")
-    return pillar[0], pillar[1]
+
+    stem = normalize_stem(pillar[0])
+    branch = normalize_branch(pillar[1])
+
+    return stem, branch
 
 def get_element_of_stem(stem: str):
     return STEM_ELEMENT[stem]
@@ -318,12 +344,19 @@ def calculate_base_pillars(birth_date: str, birth_time: str):
         utc_offset=9
     )
 
-    return {
-        "year": result["year_pillar"],
-        "month": result["month_pillar"],
-        "day": result["day_pillar"],
-        "hour": result["hour_pillar"],
-    }
+    def normalize_pillar_text(pillar_text: str):
+    if not pillar_text or len(pillar_text) < 2:
+        return pillar_text
+    s = normalize_stem(pillar_text[0])
+    b = normalize_branch(pillar_text[1])
+    return s + b
+
+return {
+    "year": normalize_pillar_text(year_pillar),
+    "month": normalize_pillar_text(month_pillar),
+    "day": normalize_pillar_text(day_pillar),
+    "hour": normalize_pillar_text(hour_pillar),
+}
 
 def calculate_engine_saju(payload: dict):
     if not isinstance(payload, dict):
