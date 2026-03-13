@@ -161,11 +161,41 @@ function mergeFixedSaju(
 }
 
 export const CATEGORIES = [
-  { id: "total", label: "종합 분석", icon: "Sparkles" },
-  { id: "wealth", label: "재물운", icon: "Coins" },
-  { id: "love", label: "애정운", icon: "Heart" },
-  { id: "career", label: "직업운", icon: "Briefcase" },
-  { id: "health", label: "건강운", icon: "Activity" },
+  {
+    id: "overall",
+    titleKr: "종합운",
+    titleEn: "Sparkles",
+    subtitle: "전체 흐름 분석",
+    icon: "sparkles",
+  },
+  {
+    id: "money",
+    titleKr: "재물운",
+    titleEn: "Coins",
+    subtitle: "돈과 소비 흐름",
+    icon: "coins",
+  },
+  {
+    id: "love",
+    titleKr: "애정운",
+    titleEn: "Heart",
+    subtitle: "연애와 관계 흐름",
+    icon: "heart",
+  },
+  {
+    id: "career",
+    titleKr: "직업운",
+    titleEn: "Briefcase",
+    subtitle: "일과 커리어 흐름",
+    icon: "briefcase",
+  },
+  {
+    id: "health",
+    titleKr: "건강운",
+    titleEn: "Activity",
+    subtitle: "체력과 컨디션 흐름",
+    icon: "activity",
+  },
 ];
 
 export async function generateUnifiedSaju(
