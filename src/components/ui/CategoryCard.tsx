@@ -46,9 +46,7 @@ export default function CategoryCard({
         {titleKr}
       </div>
 
-      <div className="mt-2 text-sm text-white/45">
-        {subtitle}
-      </div>
+      <div className="mt-2 text-sm text-white/45">{subtitle}</div>
     </button>
   );
 }
