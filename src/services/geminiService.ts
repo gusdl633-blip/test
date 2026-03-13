@@ -196,7 +196,28 @@ export const CATEGORIES = [
     subtitle: "체력과 컨디션 흐름",
     icon: "activity",
   },
-];
+] as const;
+
+const CATEGORY_LABELS: Record<string, string> = {
+  overall: "종합운",
+  money: "재물운",
+  love: "애정운",
+  career: "직업운",
+  health: "건강운",
+};
+
+const CATEGORY_PROMPTS: Record<string, string> = {
+  overall:
+    "이 사람의 전체 운 흐름을 분석해라. 현재 분위기, 가장 강한 장점, 반복되는 약점, 지금 특히 조심할 점을 중심으로 정리해라.",
+  money:
+    "이 사람의 재물운을 분석해라. 돈을 버는 방식, 새는 지점, 소비 패턴, 모아지는 구조인지 흩어지는 구조인지, 당장 조심할 금전 리스크를 정리해라.",
+  love:
+    "이 사람의 애정운을 분석해라. 연애 성향, 관계 패턴, 감정 기복, 끌리는 상대 유형, 관계에서 반복되는 실수와 지금 시점의 애정 흐름을 정리해라.",
+  career:
+    "이 사람의 직업운을 분석해라. 일복, 커리어 방향, 잘 맞는 직무 스타일, 조직형/개인형 성향, 직장에서 반복되는 문제, 지금 시점의 커리어 흐름과 조심할 점을 정리해라.",
+  health:
+    "이 사람의 건강운을 분석해라. 체력 기복, 에너지 소모 패턴, 무리하기 쉬운 포인트, 생활 습관상 취약점, 지금 시점의 건강 관리 포인트를 정리해라.",
+};
 
 export async function generateUnifiedSaju(
   profile: SajuProfile,
@@ -257,130 +278,109 @@ ${JSON.stringify(fixed, null, 2)}
 export async function generateSajuReading(
   profile: SajuProfile,
   categoryId: string,
-  session_id: string,
-  request_id: string
+  sessionId: string,
+  requestId: string
 ): Promise<UnifiedSajuResult> {
-  const fixed = await calculateSajuFromProfile(profile);
-  const category = CATEGORIES.find((c) => c.id === categoryId)?.label || "종합 분석";
+  const fixed = await generateUnifiedSaju(profile, sessionId);
 
-  const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, 30대 여성 ENTP 무당입니다.
-역할은 이미 계산된 사주 데이터를 바탕으로 "${category}" 해석 문장만 만드는 것입니다.
+  if (!CATEGORY_PROMPTS[categoryId]) {
+    throw new Error(`unknown categoryId: ${categoryId}`);
+  }
 
-규칙:
-- 반드시 JSON만 출력
-- pillar, elements, sinsal, badges 값은 생성하거나 수정하지 마라
-- 반말
-- 직설
-- 상담사 톤 금지
-- 해석은 "${category}" 중심으로 작성`;
+  const categoryLabel = CATEGORY_LABELS[categoryId];
+  const categoryPrompt = CATEGORY_PROMPTS[categoryId];
+
+  console.log("CATEGORY ID:", categoryId);
+  console.log("CATEGORY LABEL:", categoryLabel);
+  console.log("CATEGORY PROMPT:", categoryPrompt);
+  console.log("FIXED SAJU:", fixed);
 
   const prompt = `
-사용자 프로필:
+너는 사주 기반 인간 패턴 해석 시스템이다.
+
+아래는 이미 확정된 사용자 사주/성향 데이터다.
+이 값을 바꾸지 말고, 그대로 근거로만 사용해라.
+
+[확정 프로필]
+${JSON.stringify(fixed.profile, null, 2)}
+
+[확정 사주 구조]
 ${JSON.stringify(
   {
-    name: profile.name || "익명",
-    gender: profile.gender,
-    birthDate: profile.birthDate,
-    birthTime: profile.birthTime,
-    calendarType: profile.calendarType,
-    location: profile.location || "",
-    mbti: profile.mbti || "",
-    zodiac_korean: profile.zodiac_korean || "",
-    enneagram: profile.enneagram || "",
+    pillar: fixed.pillar,
+    elements: fixed.elements,
+    hidden_elements: fixed.hidden_elements,
+    visible_ten_gods: fixed.visible_ten_gods,
+    hidden_ten_gods: fixed.hidden_ten_gods,
+    badges: fixed.badges,
+    sinsal: fixed.sinsal,
+    daewoon: fixed.daewoon,
   },
   null,
   2
 )}
 
-확정 사주 데이터:
-${JSON.stringify(fixed, null, 2)}
+[현재 요청 카테고리]
+- id: ${categoryId}
+- label: ${categoryLabel}
 
-요청 카테고리:
-${category}
+[카테고리 분석 지시]
+${categoryPrompt}
 
-반드시 UnifiedSajuResult 형식의 JSON 전체를 출력하되,
-해석 문장만 생성하고 사주 원국 값은 건드리지 마라.
-`.trim();
+반드시 아래 규칙을 지켜라.
 
-  try {
-    const aiResult = await callGemini<Partial<UnifiedSajuResult>>({
-      prompt,
-      systemInstruction,
-    });
+1. 결과는 한국어로만 작성해라.
+2. 사주 원 데이터(pillar, elements, badges 등)는 절대 바꾸지 마라.
+3. 결과 JSON만 반환해라.
+4. 아래 JSON 스키마를 반드시 지켜라.
+5. summary.one_liner, core_analysis, human_structure, archetype 모두 채워라.
+6. 내용이 비어 있으면 안 된다.
+7. 직설적이고 간결하게 써라.
 
-    return mergeFixedSaju(aiResult, fixed, profile, session_id, request_id);
-  } catch (error) {
-    console.error("generateSajuReading failed:", error);
-    return createEmptyUnifiedResult(profile, fixed, session_id, request_id);
+반환 JSON 스키마:
+{
+  "summary": {
+    "one_liner": "한 줄 요약",
+    "keywords": ["키워드1", "키워드2", "키워드3"]
+  },
+  "core_analysis": [
+    "핵심 분석 1",
+    "핵심 분석 2",
+    "핵심 분석 3"
+  ],
+  "human_structure": {
+    "core_engine": "사주 기반 핵심 구조 설명",
+    "thinking_algorithm": "MBTI 기반 사고 방식 설명",
+    "instinct_temperament": "별자리 기반 기질 설명",
+    "motivation_core": "에니어그램 기반 동기 설명",
+    "weakness_pattern": "구조적 약점 설명",
+    "relationship_pattern": "관계 방식 설명"
+  },
+  "archetype": {
+    "title": "인간 유형 이름",
+    "description": "유형 설명",
+    "strengths": ["강점1", "강점2", "강점3"],
+    "weaknesses": ["약점1", "약점2", "약점3"]
   }
 }
-
-export async function chatWithSaju(
-  profile: SajuProfile,
-  history: ChatHistoryItem[],
-  userInput: string,
-  session_id: string,
-  request_id: string,
-  fixedSummary?: UnifiedSajuResult | null,
-  fixedReading?: UnifiedSajuResult | null
-): Promise<UnifiedSajuResult> {
-  const fixed = await calculateSajuFromProfile(profile);
-
-  const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, 30대 여성 ENTP 무당입니다.
-역할은 이미 계산된 사주 데이터를 바탕으로 상담 답변만 생성하는 것입니다.
-
-규칙:
-- 반드시 UnifiedSajuResult 전체 JSON으로 답해라
-- pillar, elements, sinsal, badges 값은 절대 바꾸지 마라
-- "사주 데이터가 없다" 같은 말 금지
-- 이미 제공된 사주 데이터를 바탕으로 바로 이어서 답해라
-- 반말, 직설, 짧은 문장
-- 상담사 톤 금지`;
-
-  const prompt = `
-사용자 프로필:
-${JSON.stringify(
-  {
-    name: profile.name || "익명",
-    gender: profile.gender,
-    birthDate: profile.birthDate,
-    birthTime: profile.birthTime,
-    calendarType: profile.calendarType,
-    location: profile.location || "",
-    mbti: profile.mbti || "",
-    zodiac_korean: profile.zodiac_korean || "",
-    enneagram: profile.enneagram || "",
-  },
-  null,
-  2
-)}
-
-확정 사주 데이터:
-${JSON.stringify(fixed, null, 2)}
-
-기본 사주 요약 컨텍스트:
-${JSON.stringify(fixedSummary || {}, null, 2)}
-
-현재 보고 있던 결과 카드 컨텍스트:
-${JSON.stringify(fixedReading || {}, null, 2)}
-
-사용자 질문:
-${userInput}
 `.trim();
 
-  try {
-    const aiResult = await callGemini<Partial<UnifiedSajuResult>>({
-      prompt,
-      systemInstruction,
-      history: history.map((h) => ({
-        role: h.role === "user" ? "user" : "model",
-        text: h.message,
-      })),
-    });
+  const aiResult = await callGemini<any>({
+    prompt,
+    systemInstruction:
+      "너는 한국어로만 답하는 사주 분석 엔진이다. JSON 외 텍스트를 절대 섞지 마라.",
+    history: [],
+  });
 
-    return mergeFixedSaju(aiResult, fixed, profile, session_id, request_id);
-  } catch (error) {
-    console.error("chatWithSaju failed:", error);
-    return createEmptyUnifiedResult(profile, fixed, session_id, request_id);
-  }
+  console.log("AI RESULT:", aiResult);
+
+  const parsed = normalizeCategoryReading(aiResult, categoryLabel);
+
+  return {
+    ...fixed,
+    summary: parsed.summary,
+    core_analysis: parsed.core_analysis,
+    human_structure: parsed.human_structure,
+    archetype: parsed.archetype,
+  };
 }
