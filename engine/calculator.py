@@ -7,6 +7,20 @@ else:
     SAJUPY_IMPORT_ERROR = None
 
 
+STEM_ALIAS = {
+    "甲": "갑", "乙": "을",
+    "丙": "병", "丁": "정",
+    "戊": "무", "己": "기",
+    "庚": "경", "辛": "신",
+    "壬": "임", "癸": "계",
+}
+
+BRANCH_ALIAS = {
+    "子": "자", "丑": "축", "寅": "인", "卯": "묘",
+    "辰": "진", "巳": "사", "午": "오", "未": "미",
+    "申": "신", "酉": "유", "戌": "술", "亥": "해",
+}
+
 STEM_ELEMENT = {
     "갑": "wood", "을": "wood",
     "병": "fire", "정": "fire",
@@ -83,34 +97,44 @@ DAYMASTER_STRENGTH_MONTH_SUPPORT = {
     "water": {"해", "자", "신", "유"},
 }
 
-
-
 SIMPLE_SINSAL = {
-    "문창귀인": {"갑": ["사"], "을": ["오"], "병": ["신"], "정": ["유"], "무": ["신"], "기": ["유"], "경": ["해"], "신": ["자"], "임": ["인"], "계": ["묘"]},
-    "역마살": {"인": ["신"], "오": ["신"], "술": ["신"], "신": ["인"], "자": ["인"], "진": ["인"], "사": ["해"], "유": ["해"], "축": ["해"], "해": ["사"], "묘": ["사"], "미": ["사"]},
-    "장성살": {"인": ["묘"], "오": ["오"], "술": ["유"], "신": ["유"], "자": ["자"], "진": ["묘"], "사": ["오"], "유": ["유"], "축": ["자"], "해": ["자"], "묘": ["묘"], "미": ["오"]},
-    "년살": {"인": ["축"], "오": ["사"], "술": ["유"], "신": ["미"], "자": ["해"], "진": ["묘"], "사": ["진"], "유": ["신"], "축": ["자"], "해": ["술"], "묘": ["인"], "미": ["오"]},
+    "문창귀인": {
+        "갑": ["사"], "을": ["오"], "병": ["신"], "정": ["유"], "무": ["신"],
+        "기": ["유"], "경": ["해"], "신": ["자"], "임": ["인"], "계": ["묘"]
+    },
+    "역마살": {
+        "인": ["신"], "오": ["신"], "술": ["신"], "신": ["인"], "자": ["인"],
+        "진": ["인"], "사": ["해"], "유": ["해"], "축": ["해"], "해": ["사"],
+        "묘": ["사"], "미": ["사"]
+    },
+    "장성살": {
+        "인": ["묘"], "오": ["오"], "술": ["유"], "신": ["유"], "자": ["자"],
+        "진": ["묘"], "사": ["오"], "유": ["유"], "축": ["자"], "해": ["자"],
+        "묘": ["묘"], "미": ["오"]
+    },
+    "년살": {
+        "인": ["축"], "오": ["사"], "술": ["유"], "신": ["미"], "자": ["해"],
+        "진": ["묘"], "사": ["진"], "유": ["신"], "축": ["자"], "해": ["술"],
+        "묘": ["인"], "미": ["오"]
+    },
 }
 
-STEM_ALIAS = {
-    "甲": "갑", "乙": "을",
-    "丙": "병", "丁": "정",
-    "戊": "무", "己": "기",
-    "庚": "경", "辛": "신",
-    "壬": "임", "癸": "계",
-}
-
-BRANCH_ALIAS = {
-    "子": "자", "丑": "축", "寅": "인", "卯": "묘",
-    "辰": "진", "巳": "사", "午": "오", "未": "미",
-    "申": "신", "酉": "유", "戌": "술", "亥": "해",
-}
 
 def normalize_stem(stem: str):
     return STEM_ALIAS.get(stem, stem)
 
+
 def normalize_branch(branch: str):
     return BRANCH_ALIAS.get(branch, branch)
+
+
+def normalize_pillar_text(pillar_text: str):
+    if not pillar_text or len(pillar_text) < 2:
+        return pillar_text
+    s = normalize_stem(pillar_text[0])
+    b = normalize_branch(pillar_text[1])
+    return s + b
+
 
 def normalize_time(value):
     if not value or not isinstance(value, str):
@@ -126,41 +150,33 @@ def normalize_time(value):
     except Exception:
         return "00:00"
 
+
 def split_pillar(pillar: str):
     if not pillar or len(pillar) < 2:
         raise ValueError(f"invalid pillar: {pillar}")
-
     stem = normalize_stem(pillar[0])
     branch = normalize_branch(pillar[1])
-
     return stem, branch
 
-def get_element_of_stem(stem: str):
-    return STEM_ELEMENT[stem]
 
 def get_relation(day_element: str, other_element: str):
     if day_element == other_element:
         return "same"
-
     if ELEMENT_GENERATES[day_element] == other_element:
         return "output"
-
     if ELEMENT_GENERATES[other_element] == day_element:
         return "resource"
-
     if ELEMENT_CONTROLS[day_element] == other_element:
         return "wealth"
-
     if ELEMENT_CONTROLS[other_element] == day_element:
         return "officer"
-
     return "unknown"
+
 
 def ten_god(day_stem: str, target_stem: str):
     day_element = STEM_ELEMENT[day_stem]
     target_element = STEM_ELEMENT[target_stem]
     rel = get_relation(day_element, target_element)
-
     same_polarity = STEM_YINYANG[day_stem] == STEM_YINYANG[target_stem]
 
     if rel == "same":
@@ -175,15 +191,15 @@ def ten_god(day_stem: str, target_stem: str):
         return "편인" if same_polarity else "정인"
     return ""
 
+
 def build_elements(pillar):
     result = {"wood": 0, "fire": 0, "earth": 0, "metal": 0, "water": 0}
-
     for value in pillar.values():
         stem, branch = split_pillar(value)
         result[STEM_ELEMENT[stem]] += 1
         result[BRANCH_ELEMENT[branch]] += 1
-
     return result
+
 
 def build_hidden_elements_and_tengods(pillar):
     hidden_elements = {"wood": 0, "fire": 0, "earth": 0, "metal": 0, "water": 0}
@@ -203,6 +219,7 @@ def build_hidden_elements_and_tengods(pillar):
 
     return hidden_elements, hidden_tengods
 
+
 def build_visible_tengods(pillar):
     day_stem, _ = split_pillar(pillar["day"])
     visible = {}
@@ -216,6 +233,7 @@ def build_visible_tengods(pillar):
 
     return visible
 
+
 def judge_strength(pillar, elements):
     day_stem, _ = split_pillar(pillar["day"])
     _, month_branch = split_pillar(pillar["month"])
@@ -228,7 +246,6 @@ def judge_strength(pillar, elements):
 
     same_count = elements[day_element]
 
-    # 생조 오행
     resource_element = None
     for k, v in ELEMENT_GENERATES.items():
         if v == day_element:
@@ -244,17 +261,16 @@ def judge_strength(pillar, elements):
         return "신약"
     return "중화"
 
+
 def judge_yongsin(day_stem, strength):
     day_element = STEM_ELEMENT[day_stem]
 
     if strength == "신강":
-        # 설기/극제 우선
         output = ELEMENT_GENERATES[day_element]
         wealth = ELEMENT_CONTROLS[day_element]
         return output, wealth
 
     if strength == "신약":
-        # 비겁/인성 우선
         same = day_element
         resource = None
         for k, v in ELEMENT_GENERATES.items():
@@ -263,7 +279,6 @@ def judge_yongsin(day_stem, strength):
                 break
         return resource, same
 
-    # 중화면 인성/설기 절충
     output = ELEMENT_GENERATES[day_element]
     resource = None
     for k, v in ELEMENT_GENERATES.items():
@@ -272,10 +287,10 @@ def judge_yongsin(day_stem, strength):
             break
     return resource, output
 
+
 def build_sinsal(pillar):
     day_stem, day_branch = split_pillar(pillar["day"])
     found = set()
-
     branches = [split_pillar(v)[1] for v in pillar.values()]
 
     for name, rule in SIMPLE_SINSAL.items():
@@ -292,6 +307,7 @@ def build_sinsal(pillar):
 
     return list(found)
 
+
 def next_ganzhi(pillar_str, steps):
     stems = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
     branches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
@@ -304,12 +320,10 @@ def next_ganzhi(pillar_str, steps):
     b_new = branches[(b_idx + steps) % 12]
     return s_new + b_new
 
-def build_daewoon(month_pillar, gender, year_stem):
-    # 정확한 시작 나이는 입절 계산이 필요해서 여기선 5세 고정
-    # 순행/역행만 반영
-    is_year_yang = STEM_YINYANG[year_stem] == "yang"
-    is_male = gender == "male" or gender == "남성" or gender == "남자"
 
+def build_daewoon(month_pillar, gender, year_stem):
+    is_year_yang = STEM_YINYANG[year_stem] == "yang"
+    is_male = gender in ("male", "남성", "남자")
     forward = (is_male and is_year_yang) or ((not is_male) and (not is_year_yang))
     step_sign = 1 if forward else -1
 
@@ -324,6 +338,7 @@ def build_daewoon(month_pillar, gender, year_stem):
         })
         age += 10
     return result
+
 
 def calculate_base_pillars(birth_date: str, birth_time: str):
     if calculate_saju is None:
@@ -344,19 +359,24 @@ def calculate_base_pillars(birth_date: str, birth_time: str):
         utc_offset=9
     )
 
-    def normalize_pillar_text(pillar_text: str):
-    if not pillar_text or len(pillar_text) < 2:
-        return pillar_text
-    s = normalize_stem(pillar_text[0])
-    b = normalize_branch(pillar_text[1])
-    return s + b
+    if not isinstance(result, dict):
+        raise RuntimeError(f"calculate_saju returned non-dict: {result}")
 
-return {
-    "year": normalize_pillar_text(year_pillar),
-    "month": normalize_pillar_text(month_pillar),
-    "day": normalize_pillar_text(day_pillar),
-    "hour": normalize_pillar_text(hour_pillar),
-}
+    year_pillar = result.get("year_pillar")
+    month_pillar = result.get("month_pillar")
+    day_pillar = result.get("day_pillar")
+    hour_pillar = result.get("hour_pillar")
+
+    if not all([year_pillar, month_pillar, day_pillar, hour_pillar]):
+        raise RuntimeError(f"calculate_saju returned incomplete pillars: {result}")
+
+    return {
+        "year": normalize_pillar_text(year_pillar),
+        "month": normalize_pillar_text(month_pillar),
+        "day": normalize_pillar_text(day_pillar),
+        "hour": normalize_pillar_text(hour_pillar),
+    }
+
 
 def calculate_engine_saju(payload: dict):
     if not isinstance(payload, dict):
@@ -385,7 +405,6 @@ def calculate_engine_saju(payload: dict):
     sinsal = build_sinsal(pillar)
     daewoon = build_daewoon(pillar["month"], gender, year_stem)
 
-    # 핵심격은 월지 장간 기준으로 단순화
     month_hidden = hidden_tengods["month"][0]["ten_god"] if hidden_tengods["month"] else ""
     core_pattern = month_hidden or "보통격"
 
