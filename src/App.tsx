@@ -1,361 +1,400 @@
-import React, { useState, useEffect } from 'react';
-import ProfileForm from './components/ProfileForm';
-import ResultCard from './components/ResultCard';
-import ChatInterface from './components/ChatInterface';
-import CategoryCard from './components/ui/CategoryCard';
-import SajuSummaryHeader from './components/SajuSummaryHeader';
-import { SajuProfile, UnifiedSajuResult, CATEGORIES, generateSajuReading, generateUnifiedSaju } from './services/geminiService';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, MessageSquare, User as UserIcon, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import ProfileForm from "./components/ProfileForm";
+import ResultCard from "./components/ResultCard";
+import ChatInterface from "./components/ChatInterface";
+import CategoryCard from "./components/ui/CategoryCard";
+import SajuSummaryHeader from "./components/SajuSummaryHeader";
+import {
+  SajuProfile,
+  UnifiedSajuResult,
+  CATEGORIES,
+  generateSajuReading,
+  generateUnifiedSaju,
+} from "./services/geminiService";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, MessageSquare, User as UserIcon, LogOut } from "lucide-react";
 import ErrorModal from "./components/ErrorModal";
 
-type View = 'onboarding' | 'dashboard' | 'result' | 'chat';
+type View = "onboarding" | "dashboard" | "result" | "chat";
 
 export default function App() {
-const [view, setView] = useState<View>("onboarding");
-const [profile, setProfile] = useState<SajuProfile | null>(null);
-const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
-const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
-const [currentCategory, setCurrentCategory] = useState<string | null>(null);
+  const [view, setView] = useState<View>("onboarding");
+  const [profile, setProfile] = useState<SajuProfile | null>(null);
+  const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
+  const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
+  const [currentCategory, setCurrentCategory] = useState<string | null>(null);
 
-const [isLoading, setIsLoading] = useState(false);
-const [errorMessage, setErrorMessage] = useState<string | null>(null);
-const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingSummary, setIsFetchingSummary] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
-const [sessionId, setSessionId] = useState<string>(() =>
-  Math.random().toString(36).substring(7)
-);
-const [initialChatInput, setInitialChatInput] = useState<string>("");
+  const [sessionId, setSessionId] = useState<string>(() =>
+    Math.random().toString(36).substring(7)
+  );
 
-  // Load profile from local storage on mount
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash === '#setup') {
-        setView('onboarding');
-      } else {
-        const saved = localStorage.getItem('saju_profile');
-        if (saved) {
-          const parsedProfile = JSON.parse(saved);
-          setProfile(parsedProfile);
-          setView('dashboard');
-          fetchSummary(parsedProfile);
-        } else {
-          setView('onboarding');
-          window.location.hash = '#setup';
-        }
+  const [initialChatInput, setInitialChatInput] = useState<string>("");
+
+  const fetchSummary = async (data: SajuProfile) => {
+    if (isFetchingSummary) return;
+
+    setIsFetchingSummary(true);
+    try {
+      setErrorMessage(null);
+      const fixed = await generateUnifiedSaju(data, sessionId);
+      setProfile(data);
+      setSummary(fixed);
+    } catch (error: any) {
+      console.error("fetchSummary failed:", error);
+      setErrorMessage("기본 사주 요약을 불러오지 못했다.\n잠시 후 다시 시도해라.");
+      setRetryAction(() => async () => {
+        await fetchSummary(data);
+      });
+    } finally {
+      setIsFetchingSummary(false);
+    }
+  };
+
+  const handleProfileSubmit = async (data: SajuProfile) => {
+    setSummary(null);
+    setReading(null);
+    setCurrentCategory(null);
+    setInitialChatInput("");
+    setErrorMessage(null);
+    setRetryAction(null);
+
+    setProfile(data);
+    localStorage.setItem("saju_profile", JSON.stringify(data));
+
+    window.location.hash = "";
+    setView("dashboard");
+
+    await fetchSummary(data);
+  };
+
+  const handleCategorySelect = async (categoryId: string) => {
+    if (!profile) return;
+
+    const run = async () => {
+      const requestId = Math.random().toString(36).substring(7);
+
+      try {
+        setErrorMessage(null);
+        setCurrentCategory(categoryId);
+        setReading(null);
+        setIsLoading(true);
+        setView("result");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
+
+        console.log("CATEGORY RESULT:", result);
+        console.log("SUMMARY:", result?.summary);
+        console.log("ONE LINER:", result?.summary?.one_liner);
+
+        setReading(result);
+      } catch (error: any) {
+        console.error("generateSajuReading failed:", error);
+
+        const message =
+          error?.message?.includes("503") ||
+          error?.message?.includes("UNAVAILABLE") ||
+          error?.message?.includes("high demand")
+            ? "지금 해석 엔진 요청이 몰렸다.\n몇 초 뒤 다시 시도해라."
+            : "카테고리 해석 중 문제가 생겼다.\n잠시 후 다시 시도해라.";
+
+        setErrorMessage(message);
+        setRetryAction(() => run);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-const fetchSummary = async (p: SajuProfile, customSessionId?: string) => {
-  const run = async () => {
-    const requestId = Math.random().toString(36).substring(7);
-    const activeSessionId = customSessionId || sessionId;
-
-    const profileKey = `${p.birthDate}|${p.birthTime || "00:00"}|${p.calendarType}|${p.location || "none"}|${p.gender}`;
-
-    try {
-      setErrorMessage(null);
-      setIsLoading(true);
-
-      const data = await generateUnifiedSaju(p, activeSessionId, requestId);
-      setSummary(data);
-      localStorage.setItem(`saju_cache_${profileKey}`, JSON.stringify(data));
-    } catch (e: any) {
-      console.error("Failed to fetch summary:", e);
-      setErrorMessage("기본 사주 요약을 불러오지 못했다.\n잠시 후 다시 시도해라.");
-      setRetryAction(() => run);
-    } finally {
-      setIsLoading(false);
-    }
+    await run();
   };
-
-  await run();
-};
-
-const handleProfileSubmit = async (data: SajuProfile) => {
-  // 이전 사람 데이터 즉시 제거
-  setSummary(null);
-  setReading(null);
-  setCurrentCategory(null);
-  setInitialChatInput("");
-  setErrorMessage(null);
-  setRetryAction(null);
-
-  // 세션도 새로
-  const newSessionId = Math.random().toString(36).substring(7);
-  setSessionId(newSessionId);
-
-  // 프로필 저장
-  setProfile(data);
-  localStorage.setItem("saju_profile", JSON.stringify(data));
-
-  window.location.hash = "";
-  setView("dashboard");
-
-  await fetchSummary(data, newSessionId);
-};
-
-const handleCategorySelect = async (categoryId: string) => {
-  if (!profile) return;
-
-  const run = async () => {
-    const requestId = Math.random().toString(36).substring(7);
-
-    try {
-      setErrorMessage(null);
-      setCurrentCategory(categoryId);
-      setReading(null);
-      setIsLoading(true);
-      setView("result");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-
-      const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
-      setReading(result);
-    } catch (error: any) {
-      console.error("generateSajuReading failed:", error);
-
-      const message =
-        error?.message?.includes("503") ||
-        error?.message?.includes("UNAVAILABLE") ||
-        error?.message?.includes("high demand")
-          ? "지금 해석 엔진 요청이 몰렸다.\n몇 초 뒤 다시 시도해라."
-          : "카테고리 해석 중 문제가 생겼다.\n잠시 후 다시 시도해라.";
-
-      setErrorMessage(message);
-      setRetryAction(() => run);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  await run();
-};
 
   const resetProfile = () => {
-  if (!confirm("모든 정보와 대화 내역이 초기화됩니다. 계속하시겠습니까?")) return;
+    if (!confirm("모든 정보와 대화 내역이 초기화된다. 계속하겠습니까?")) return;
 
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith("saju_")) {
-      localStorage.removeItem(key);
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("saju_")) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    setProfile(null);
+    setSummary(null);
+    setReading(null);
+    setCurrentCategory(null);
+    setInitialChatInput("");
+    setErrorMessage(null);
+    setRetryAction(null);
+    setIsLoading(false);
+    setIsFetchingSummary(false);
+    setSessionId(Math.random().toString(36).substring(7));
+    setView("onboarding");
+
+    window.location.hash = "#setup";
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("saju_profile");
+
+    if (!saved) {
+      setView("onboarding");
+      if (window.location.hash !== "#setup") {
+        window.location.hash = "#setup";
+      }
+      return;
     }
-  });
 
-  setProfile(null);
-  setSummary(null);
-  setReading(null);
-  setCurrentCategory(null);
-  setInitialChatInput("");
-  setErrorMessage(null);
-  setRetryAction(null);
-  setSessionId(Math.random().toString(36).substring(7));
+    try {
+      const parsedProfile = JSON.parse(saved) as SajuProfile;
+      setProfile(parsedProfile);
+      setView(window.location.hash === "#setup" ? "onboarding" : "dashboard");
+      fetchSummary(parsedProfile);
+    } catch (e) {
+      console.error("failed to parse saved profile", e);
+      localStorage.removeItem("saju_profile");
+      setProfile(null);
+      setSummary(null);
+      setReading(null);
+      setView("onboarding");
+      window.location.hash = "#setup";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  setView("onboarding");
-  window.location.hash = "#setup";
-};
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+
+      if (hash === "#setup") {
+        setView("onboarding");
+      } else if (profile) {
+        setView("dashboard");
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [profile]);
+
+  const activeCategory = CATEGORIES.find((c) => c.id === currentCategory);
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Radial Glow Background */}
-      <div className="radial-glow" />
-      <div className="fixed top-[-10%] right-[-10%] w-[40%] h-[40%] bg-neon-primary/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-neon-secondary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_center,_rgba(0,255,163,0.08),_transparent_35%),linear-gradient(180deg,_#02131B_0%,_#02070B_100%)]" />
+      <div className="fixed inset-0 -z-10 opacity-[0.08] bg-[linear-gradient(to_right,transparent_0%,rgba(255,255,255,0.05)_50%,transparent_100%)] bg-[length:100%_4px]" />
 
-      {/* Header */}
-      <header className="p-6 flex justify-between items-center z-50">
-          <div 
-            className="flex items-center space-x-3 cursor-pointer group" 
-            onClick={() => {
-              if (profile) {
-                setInitialChatInput('');
-                window.location.hash = '';
-                setView('dashboard');
-              }
-            }}
-          >
-          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center group-hover:border-neon-primary/50 transition-all shadow-[0_0_20px_rgba(0,255,156,0.1)]">
-            <Sparkles className="w-6 h-6 text-neon-primary" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="text-xl font-bold tracking-tighter text-white">천명(天命)</h1>
-            <span className="text-[10px] text-neon-primary font-bold tracking-widest uppercase opacity-60">Futuristic Saju</span>
+      <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <a href="#setup" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-neon-primary/20 to-neon-secondary/20 border border-neon-primary/30 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-neon-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-black tracking-tight text-white group-hover:text-neon-primary transition-colors">
+                천명(天命)
+              </h1>
+              <p className="text-[11px] tracking-[0.2em] text-neon-primary/80 uppercase">
+                Futuristic Saju
+              </p>
+            </div>
+          </a>
+
+          <div className="flex items-center gap-2">
+            {profile && (
+              <>
+                <button
+                  onClick={() => setView("chat")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    상담
+                  </span>
+                </button>
+
+                <button
+                  onClick={resetProfile}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-red-400/40 hover:text-red-300 transition-colors"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <LogOut className="w-4 h-4" />
+                    나가기
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </div>
-        
-        {profile && (
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={() => {
-                setInitialChatInput('');
-                setView('chat');
-              }}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${
-                view === 'chat' 
-                  ? 'bg-neon-secondary/20 border-neon-secondary text-neon-secondary shadow-[0_0_15px_rgba(91,225,255,0.2)]' 
-                  : 'bg-white/5 border-white/10 text-text-sub hover:text-white hover:border-white/20'
-              }`}
-            >
-              <MessageSquare className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={resetProfile}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-text-sub hover:text-red-400 hover:border-red-400/30 transition-all"
-              title="정보 초기화"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        )}
       </header>
 
-      <main className="flex-1 z-10">
+      <main className="flex-1">
         <AnimatePresence mode="wait">
-          {view === 'onboarding' && (
-            <motion.div 
+          {view === "onboarding" && (
+            <motion.section
               key="onboarding"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="container mx-auto px-6 py-4"
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35 }}
+              className="max-w-7xl mx-auto px-4 py-10"
             >
-              <ProfileForm onSubmit={handleProfileSubmit} />
-            </motion.div>
-          )}
-
-          {view === 'dashboard' && (
-            <motion.div 
-              key="dashboard"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col"
-            >
-              <SajuSummaryHeader
-  key={`${profile?.birthDate || "none"}-${profile?.birthTime || "none"}-${profile?.gender || "none"}`}
-  data={
-    summary &&
-    summary.profile?.birth === profile?.birthDate
-      ? summary
-      : undefined
-  }
-/>
-              
-              <div className="container mx-auto px-6 py-4 space-y-12">
-                <div className="text-center space-y-4">
-                  <motion.h2 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-4xl md:text-5xl font-bold tracking-tight text-white"
-                  >
-                    반갑습니다, <span className="text-neon-primary">{profile?.name || '익명'}</span>님
-                  </motion.h2>
-                  <p className="text-text-sub text-lg">오늘 당신의 운명은 어떤 흐름을 향하고 있나요?</p>
+              <div className="max-w-5xl mx-auto text-center mb-10">
+                <div className="inline-flex items-center gap-2 rounded-full border border-neon-primary/20 bg-neon-primary/10 px-4 py-2 text-neon-primary text-sm mb-5">
+                  <Sparkles className="w-4 h-4" />
+                  인간 구조 분석 시스템
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                  {CATEGORIES.map((cat, index) => (
-                    <CategoryCard
-                      key={cat.id}
-                      number={(index + 1).toString().padStart(2, '0')}
-                      icon={cat.icon}
-                      label={cat.label}
-                      onClick={() => handleCategorySelect(cat.id)}
-                    />
-                  ))}
+                <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-4 leading-tight">
+                  너를 구성하는 패턴을
+                  <br />
+                  <span className="text-neon-primary">정확하게 읽어낸다</span>
+                </h2>
+
+                <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+                  사주, MBTI, 별자리, 에니어그램을 한 구조로 묶어 네 사고, 감정, 관계 패턴을 해석한다.
+                </p>
+              </div>
+
+              <ProfileForm onSubmit={handleProfileSubmit} />
+            </motion.section>
+          )}
+
+          {view === "dashboard" && profile && summary && (
+            <motion.section
+              key="dashboard"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35 }}
+              className="max-w-7xl mx-auto px-4 py-8"
+            >
+              <SajuSummaryHeader summary={summary} profile={profile} />
+
+              <div className="mt-12 mb-10 text-center">
+                <h2 className="text-5xl font-black tracking-tight text-white">
+                  반갑습니다, <span className="text-neon-primary">{profile.name || "이땡땡"}님</span>
+                </h2>
+                <p className="text-white/50 mt-3 text-lg">
+                  오늘 당신의 운명은 어떤 흐름을 향하고 있나요?
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-5">
+                {CATEGORIES.map((category, index) => (
+                  <CategoryCard
+                    key={category.id}
+                    index={index + 1}
+                    title={category.title}
+                    subtitle={category.subtitle}
+                    icon={category.icon}
+                    onClick={() => handleCategorySelect(category.id)}
+                  />
+                ))}
+              </div>
+            </motion.section>
+          )}
+
+          {view === "result" && profile && (
+            <motion.section
+              key="result"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35 }}
+              className="max-w-7xl mx-auto px-4 py-8"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setView("dashboard");
+                    setCurrentCategory(null);
+                    setReading(null);
+                  }}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
+                >
+                  ← 돌아가기
+                </button>
+
+                {activeCategory && (
+                  <div className="text-right">
+                    <div className="text-white/40 text-xs uppercase tracking-[0.2em]">Category</div>
+                    <div className="text-white font-semibold">{activeCategory.title}</div>
+                  </div>
+                )}
+              </div>
+
+              <ResultCard
+                profile={profile}
+                summary={summary}
+                reading={reading}
+                category={activeCategory}
+                isLoading={isLoading}
+                onAskDeeper={(prompt) => {
+                  setInitialChatInput(prompt);
+                  setView("chat");
+                }}
+              />
+            </motion.section>
+          )}
+
+          {view === "chat" && profile && (
+            <motion.section
+              key="chat"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35 }}
+              className="max-w-7xl mx-auto px-4 py-8"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <button
+                  onClick={() => setView(summary ? "dashboard" : "onboarding")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
+                >
+                  ← 돌아가기
+                </button>
+
+                <div className="inline-flex items-center gap-2 rounded-full border border-neon-primary/20 bg-neon-primary/10 px-4 py-2 text-neon-primary text-sm">
+                  <MessageSquare className="w-4 h-4" />
+                  내 사주 상담
                 </div>
               </div>
-            </motion.div>
-          )}
 
-          {view === 'result' && (
-            <div key="result" className="container mx-auto px-6 py-4">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-32 space-y-8">
-                  <div className="relative">
-                    <motion.div 
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="w-24 h-24 border-2 border-neon-primary/10 border-t-neon-primary rounded-full"
-                    />
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    >
-                      <Sparkles className="w-8 h-8 text-neon-primary shadow-[0_0_20px_rgba(0,255,156,0.5)]" />
-                    </motion.div>
-                  </div>
-                  <div className="text-center space-y-3">
-                    <p className="text-2xl font-bold text-white tracking-tight">하늘의 기운을 읽는 중입니다</p>
-                    <p className="text-text-sub animate-pulse">잠시만 기다려주세요...</p>
-                  </div>
-                </div>
-              ) : reading && (
-                <ResultCard 
-                  reading={reading} 
-                  categoryLabel={CATEGORIES.find(c => c.id === currentCategory)?.label || ''}
-                  onConsult={(question?: string) => {
-                    setInitialChatInput(question || '');
-                    setView('chat');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          {view === 'chat' && profile && (
-            <motion.div 
-              key="chat"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="container mx-auto px-6 py-4"
-            >
-            <ChatInterface
-  profile={profile}
-  sessionId={sessionId}
-  initialMessage={initialChatInput}
-  summary={summary}
-  reading={reading}
-/>
-            </motion.div>
+              <ChatInterface
+                profile={profile}
+                summary={summary}
+                reading={reading}
+                sessionId={sessionId}
+                initialInput={initialChatInput}
+                onInitialInputConsumed={() => setInitialChatInput("")}
+              />
+            </motion.section>
           )}
         </AnimatePresence>
       </main>
 
-      <footer className="p-10 text-center space-y-3 z-10">
-        <div className="flex justify-center space-x-4 mb-4">
-          <div className="w-1 h-1 bg-neon-primary rounded-full" />
-          <div className="w-1 h-1 bg-neon-secondary rounded-full" />
-          <div className="w-1 h-1 bg-accent rounded-full" />
+      <footer className="py-8 text-center text-white/30 text-xs">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <UserIcon className="w-3 h-3" />
+          <span>© 2026 천명(天命) · Futuristic Saju System</span>
         </div>
-        <p className="text-[10px] text-text-sub/40 uppercase tracking-[0.3em]">© 2026 천명(天命) - Futuristic Saju System</p>
-        <p className="text-[10px] text-text-sub/20 max-w-md mx-auto leading-relaxed">
-          본 서비스는 인공지능 기술을 활용한 참고용이며, 중대한 결정은 전문가와 상담하시기 바랍니다.
-        </p>
+        <p>이 분석은 참고용 해석이며, 절대적 진실이 아니라 패턴 해석 도구입니다.</p>
       </footer>
+
       <ErrorModal
-  open={!!errorMessage}
-  message={errorMessage || ""}
-  onClose={() => {
-    setErrorMessage(null);
-    setRetryAction(null);
-  }}
-  onRetry={
-    retryAction
-      ? async () => {
+        open={!!errorMessage}
+        title="해석 중 오류가 났다"
+        message={errorMessage || ""}
+        onRetry={retryAction || undefined}
+        onClose={() => {
           setErrorMessage(null);
-          await retryAction();
-        }
-      : undefined
-  }
-/>
+          setRetryAction(null);
+        }}
+      />
     </div>
   );
 }
