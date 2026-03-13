@@ -285,15 +285,16 @@ export default function App() {
 
               <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-5">
                 {CATEGORIES.map((category, index) => (
-                  <CategoryCard
-                    key={category.id}
-                    index={index + 1}
-                    title={category.title}
-                    subtitle={category.subtitle}
-                    icon={category.icon}
-                    onClick={() => handleCategorySelect(category.id)}
-                  />
-                ))}
+  <CategoryCard
+    key={category.id}
+    index={index + 1}
+    titleKr={category.titleKr}
+    titleEn={category.titleEn}
+    subtitle={category.subtitle}
+    icon={category.icon}
+    onClick={() => handleCategorySelect(category.id)}
+  />
+))}
               </div>
             </motion.section>
           )}
