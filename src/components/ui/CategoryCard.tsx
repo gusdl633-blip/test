@@ -1,43 +1,54 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React from "react";
+import { Sparkles, Coins, Heart, Briefcase, Activity } from "lucide-react";
 
-interface Props {
-  number: string;
+type CategoryCardProps = {
+  index: number;
+  titleKr: string;
+  titleEn: string;
+  subtitle: string;
   icon: string;
-  label: string;
-  description?: string;
   onClick: () => void;
-  key?: React.Key;
-}
+};
 
-export default function CategoryCard({ number, icon, label, description, onClick }: Props) {
+const iconMap: Record<string, React.ReactNode> = {
+  sparkles: <Sparkles className="w-5 h-5" />,
+  coins: <Coins className="w-5 h-5" />,
+  heart: <Heart className="w-5 h-5" />,
+  briefcase: <Briefcase className="w-5 h-5" />,
+  activity: <Activity className="w-5 h-5" />,
+};
+
+export default function CategoryCard({
+  index,
+  titleKr,
+  titleEn,
+  subtitle,
+  icon,
+  onClick,
+}: CategoryCardProps) {
   return (
-    <motion.button
-      whileHover={{ scale: 1.02, y: -5 }}
-      whileTap={{ scale: 0.98 }}
+    <button
       onClick={onClick}
-      className="glass-panel p-6 flex flex-col items-start text-left relative overflow-hidden group border-white/5 hover:border-neon-primary/30 transition-all duration-300"
+      className="group relative rounded-[28px] border border-white/10 bg-black/30 p-6 text-left transition-all duration-300 hover:border-neon-primary/40 hover:bg-white/[0.03] hover:-translate-y-1"
     >
-      {/* Background Glow */}
-      <div className="absolute -right-4 -top-4 w-24 h-24 bg-neon-primary/5 rounded-full blur-3xl group-hover:bg-neon-primary/10 transition-colors" />
-      
-      <span className="text-4xl font-bold text-white/10 mb-4 group-hover:text-neon-primary/20 transition-colors">
-        {number}
-      </span>
-      
-      <div className="text-4xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-        {icon}
+      <div className="mb-6 text-5xl font-black leading-none text-white/10">
+        {String(index).padStart(2, "0")}
       </div>
-      
-      <h3 className="text-lg font-bold text-text-main mb-1 group-hover:text-neon-primary transition-colors">
-        {label}
-      </h3>
-      
-      {description && (
-        <p className="text-xs text-text-sub line-clamp-2">
-          {description}
-        </p>
-      )}
-    </motion.button>
+
+      <div className="mb-4 flex items-center gap-3 text-neon-primary">
+        {iconMap[icon] || <Sparkles className="w-5 h-5" />}
+        <span className="text-xs uppercase tracking-[0.2em] text-white/35">
+          {titleEn}
+        </span>
+      </div>
+
+      <div className="text-3xl font-black tracking-tight text-white group-hover:text-neon-primary transition-colors">
+        {titleKr}
+      </div>
+
+      <div className="mt-2 text-sm text-white/45">
+        {subtitle}
+      </div>
+    </button>
   );
 }
