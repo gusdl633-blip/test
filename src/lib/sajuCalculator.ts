@@ -1,6 +1,19 @@
 import type { SajuProfile } from "../types";
 
 export type CalculatedSaju = {
+  profile: {
+    name: string;
+    birth: string;
+    time: string;
+    calendar: string;
+    gender: string;
+    location: string;
+    mbti: string;
+    zodiac_korean: string;
+    enneagram: string;
+    ilgan: string;
+    ilgan_display: string;
+  };
   pillar: {
     year: string;
     month: string;
@@ -14,9 +27,15 @@ export type CalculatedSaju = {
     metal: number;
     water: number;
   };
-  ilgan: string;
-  ilgan_display: string;
-  sinsal: string[];
+  hidden_elements?: {
+    wood: number;
+    fire: number;
+    earth: number;
+    metal: number;
+    water: number;
+  };
+  visible_ten_gods?: Record<string, unknown>;
+  hidden_ten_gods?: Record<string, unknown>;
   badges: {
     ilgan: string;
     strength: string;
@@ -24,25 +43,14 @@ export type CalculatedSaju = {
     gisin: string;
     core_pattern: string;
   };
-  raw?: any;
+  sinsal: string[];
+  daewoon: Array<{
+    age_start: number;
+    age_end: number;
+    pillar: string;
+  }>;
+  ok?: boolean;
 };
-
-function fallbackIlangan(dayPillar: string) {
-  const stem = dayPillar?.[0] || "";
-  const map: Record<string, string> = {
-    갑: "갑목",
-    을: "을목",
-    병: "병화",
-    정: "정화",
-    무: "무토",
-    기: "기토",
-    경: "경금",
-    신: "신금",
-    임: "임수",
-    계: "계수",
-  };
-  return map[stem] || stem;
-}
 
 export async function calculateSajuFromProfile(
   profile: SajuProfile
@@ -65,59 +73,80 @@ export async function calculateSajuFromProfile(
     }),
   });
 
-const text = await res.text();
-console.log("SAJU API TEXT RAW:", text);
+  const text = await res.text();
+  console.log("SAJU API TEXT RAW:", text);
 
-let data: any = {};
-try {
-  data = text ? JSON.parse(text) : {};
-} catch (e) {
-  console.error("SAJU API JSON PARSE FAILED:", e);
-  throw new Error(text || "saju calculation failed");
-}
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    console.error("SAJU API JSON PARSE FAILED:", e);
+    throw new Error(text || "saju calculation failed");
+  }
 
-console.log("SAJU API RAW:", data);
+  console.log("SAJU API RAW:", data);
 
-if (!res.ok) {
-  console.error("SAJU API ERROR BODY RAW:", JSON.stringify(data, null, 2));
-  console.error("SAJU API ERROR BODY OBJECT:", data);
+  if (!res.ok || data?.ok === False) {
+    console.error("SAJU API ERROR BODY RAW:", JSON.stringify(data, null, 2));
+    console.error("SAJU API ERROR BODY OBJECT:", data);
 
-  throw new Error(
-    data?.detail ||
-    data?.error ||
-    JSON.stringify(data) ||
-    "saju calculation failed"
-  );
-}
+    throw new Error(
+      data?.detail ||
+      data?.error ||
+      JSON.stringify(data) ||
+      "saju calculation failed"
+    );
+  }
 
-  const pillar = {
-    year: data?.pillar?.year ?? "",
-    month: data?.pillar?.month ?? "",
-    day: data?.pillar?.day ?? "",
-    hour: data?.pillar?.hour ?? "",
-  };
-
-  const ilganFallback = fallbackIlangan(pillar.day);
+  if (!data?.pillar || !data?.profile || !data?.elements || !data?.badges) {
+    throw new Error(`invalid saju response: ${JSON.stringify(data)}`);
+  }
 
   return {
-    pillar,
+    profile: {
+      name: data.profile?.name ?? "",
+      birth: data.profile?.birth ?? "",
+      time: data.profile?.time ?? "",
+      calendar: data.profile?.calendar ?? "solar",
+      gender: data.profile?.gender ?? "",
+      location: data.profile?.location ?? "Seoul",
+      mbti: data.profile?.mbti ?? "",
+      zodiac_korean: data.profile?.zodiac_korean ?? "",
+      enneagram: data.profile?.enneagram ?? "",
+      ilgan: data.profile?.ilgan ?? "",
+      ilgan_display: data.profile?.ilgan_display ?? "",
+    },
+    pillar: {
+      year: data.pillar?.year ?? "",
+      month: data.pillar?.month ?? "",
+      day: data.pillar?.day ?? "",
+      hour: data.pillar?.hour ?? "",
+    },
     elements: {
-      wood: data?.elements?.wood ?? 0,
-      fire: data?.elements?.fire ?? 0,
-      earth: data?.elements?.earth ?? 0,
-      metal: data?.elements?.metal ?? 0,
-      water: data?.elements?.water ?? 0,
+      wood: Number(data.elements?.wood ?? 0),
+      fire: Number(data.elements?.fire ?? 0),
+      earth: Number(data.elements?.earth ?? 0),
+      metal: Number(data.elements?.metal ?? 0),
+      water: Number(data.elements?.water ?? 0),
     },
-    ilgan: data?.profile?.ilgan ?? ilganFallback,
-    ilgan_display: data?.profile?.ilgan_display ?? `${ilganFallback} 일간`,
-    sinsal: data?.sinsal ?? [],
+    hidden_elements: {
+      wood: Number(data.hidden_elements?.wood ?? 0),
+      fire: Number(data.hidden_elements?.fire ?? 0),
+      earth: Number(data.hidden_elements?.earth ?? 0),
+      metal: Number(data.hidden_elements?.metal ?? 0),
+      water: Number(data.hidden_elements?.water ?? 0),
+    },
+    visible_ten_gods: data.visible_ten_gods ?? {},
+    hidden_ten_gods: data.hidden_ten_gods ?? {},
     badges: {
-      ilgan: data?.badges?.ilgan ?? ilganFallback,
-      strength: data?.badges?.strength ?? "",
-      yongsin: data?.badges?.yongsin ?? "",
-      gisin: data?.badges?.gisin ?? "",
-      core_pattern: data?.badges?.core_pattern ?? "",
+      ilgan: data.badges?.ilgan ?? "",
+      strength: data.badges?.strength ?? "",
+      yongsin: data.badges?.yongsin ?? "",
+      gisin: data.badges?.gisin ?? "",
+      core_pattern: data.badges?.core_pattern ?? "",
     },
-    raw: data,
+    sinsal: Array.isArray(data.sinsal) ? data.sinsal : [],
+    daewoon: Array.isArray(data.daewoon) ? data.daewoon : [],
+    ok: true,
   };
 }
