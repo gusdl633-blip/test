@@ -437,3 +437,92 @@ ${categoryPrompt}
     archetype: parsed.archetype,
   };
 }
+
+export async function chatWithSaju(
+  profile: SajuProfile,
+  summary: UnifiedSajuResult | null,
+  reading: UnifiedSajuResult | null,
+  userInput: string,
+  sessionId: string,
+  requestId: string
+): Promise<UnifiedSajuResult> {
+  const fixed = summary ?? (await generateUnifiedSaju(profile, sessionId));
+
+  const prompt = `
+너는 사주 기반 상담 엔진이다.
+
+아래는 이미 확정된 사용자 데이터다.
+절대 바꾸지 말고, 이 값을 근거로만 답해라.
+
+[프로필]
+${JSON.stringify(fixed.profile, null, 2)}
+
+[사주 구조]
+${JSON.stringify(
+  {
+    pillar: fixed.pillar,
+    elements: fixed.elements,
+    hidden_elements: fixed.hidden_elements,
+    visible_ten_gods: fixed.visible_ten_gods,
+    hidden_ten_gods: fixed.hidden_ten_gods,
+    badges: fixed.badges,
+    sinsal: fixed.sinsal,
+    daewoon: fixed.daewoon,
+  },
+  null,
+  2
+)}
+
+[현재 보고 있던 리딩]
+${JSON.stringify(reading ?? {}, null, 2)}
+
+[사용자 질문]
+${userInput}
+
+반드시 한국어로만 답해라.
+JSON만 반환해라.
+
+반환 JSON 스키마:
+{
+  "summary": {
+    "one_liner": "질문에 대한 한 줄 답"
+  },
+  "core_analysis": [
+    "답변 1",
+    "답변 2",
+    "답변 3"
+  ],
+  "human_structure": {
+    "core_engine": "사주 기반 설명",
+    "thinking_algorithm": "MBTI 기반 설명",
+    "instinct_temperament": "별자리 기반 설명",
+    "motivation_core": "에니어그램 기반 설명",
+    "weakness_pattern": "구조적 약점 설명",
+    "relationship_pattern": "관계 패턴 설명"
+  },
+  "archetype": {
+    "title": "유형 이름",
+    "description": "유형 설명",
+    "strengths": ["강점1", "강점2", "강점3"],
+    "weaknesses": ["약점1", "약점2", "약점3"]
+  }
+}
+`.trim();
+
+  const aiResult = await callGemini<any>({
+    prompt,
+    systemInstruction:
+      "너는 한국어로만 답하는 사주 상담 엔진이다. JSON 외 텍스트를 절대 섞지 마라.",
+    history: [],
+  });
+
+  const parsed = normalizeCategoryReading(aiResult, "상담");
+
+  return {
+    ...fixed,
+    summary: parsed.summary,
+    core_analysis: parsed.core_analysis,
+    human_structure: parsed.human_structure,
+    archetype: parsed.archetype,
+  };
+}
