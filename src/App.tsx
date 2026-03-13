@@ -284,7 +284,7 @@ export default function App() {
               </div>
 
               <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-5">
-                {CATEGORIES.map((category, index) => (
+               {CATEGORIES.map((category, index) => (
   <CategoryCard
     key={category.id}
     index={index + 1}
@@ -323,7 +323,8 @@ export default function App() {
                 {activeCategory && (
                   <div className="text-right">
                     <div className="text-white/40 text-xs uppercase tracking-[0.2em]">Category</div>
-                    <div className="text-white font-semibold">{activeCategory.title}</div>
+                   <div className="text-white font-semibold">{activeCategory.titleKr}</div>
+<div className="text-white/35 text-xs mt-1">{activeCategory.titleEn}</div>
                   </div>
                 )}
               </div>
