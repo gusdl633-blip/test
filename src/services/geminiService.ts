@@ -275,6 +275,59 @@ ${JSON.stringify(fixed, null, 2)}
   }
 }
 
+function normalizeCategoryReading(aiResult: any, categoryLabel: string) {
+  const summary = {
+    one_liner:
+      aiResult?.summary?.one_liner ||
+      `${categoryLabel} 기준으로 보면 지금 흐름은 분명한 방향성이 있다.`,
+    keywords: Array.isArray(aiResult?.summary?.keywords)
+      ? aiResult.summary.keywords.slice(0, 3)
+      : [categoryLabel, "흐름", "패턴"],
+  };
+
+  const core_analysis = Array.isArray(aiResult?.core_analysis)
+    ? aiResult.core_analysis.slice(0, 3)
+    : [
+        `${categoryLabel} 기준 첫 번째 핵심 흐름이 보인다.`,
+        `${categoryLabel} 기준 반복되는 패턴이 있다.`,
+        `${categoryLabel} 기준 지금 조심해야 할 지점이 분명하다.`,
+      ];
+
+  const human_structure = {
+    core_engine:
+      aiResult?.human_structure?.core_engine || "사주 구조상 기본 엔진 분석 중.",
+    thinking_algorithm:
+      aiResult?.human_structure?.thinking_algorithm || "사고 알고리즘 분석 중.",
+    instinct_temperament:
+      aiResult?.human_structure?.instinct_temperament || "기질 패턴 분석 중.",
+    motivation_core:
+      aiResult?.human_structure?.motivation_core || "동기 코어 분석 중.",
+    weakness_pattern:
+      aiResult?.human_structure?.weakness_pattern || "구조적 약점 분석 중.",
+    relationship_pattern:
+      aiResult?.human_structure?.relationship_pattern || "관계 패턴 분석 중.",
+  };
+
+  const archetype = {
+    title: aiResult?.archetype?.title || `${categoryLabel} 중심형`,
+    description:
+      aiResult?.archetype?.description || `${categoryLabel}을 기준으로 인간 유형을 해석한 결과다.`,
+    strengths: Array.isArray(aiResult?.archetype?.strengths)
+      ? aiResult.archetype.strengths.slice(0, 3)
+      : ["집중력", "직관", "반응력"],
+    weaknesses: Array.isArray(aiResult?.archetype?.weaknesses)
+      ? aiResult.archetype.weaknesses.slice(0, 3)
+      : ["기복", "과몰입", "소진"],
+  };
+
+  return {
+    summary,
+    core_analysis,
+    human_structure,
+    archetype,
+  };
+}
+
 export async function generateSajuReading(
   profile: SajuProfile,
   categoryId: string,
