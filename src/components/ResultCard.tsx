@@ -1,5 +1,5 @@
-import React from 'react';
-import { UnifiedSajuResult } from '../services/geminiService';
+import React, { useEffect, useRef } from 'react';
+import type { SajuProfile, UnifiedSajuResult } from '../services/geminiService';
 import { motion } from 'motion/react';
 import {
   Sparkles,
@@ -12,14 +12,87 @@ import {
 import NeonCard from './ui/NeonCard';
 import GlowButton from './ui/GlowButton';
 
+type Category = { titleKr?: string; titleEn?: string } | null;
+
 interface Props {
-  reading: UnifiedSajuResult;
-  categoryLabel: string;
-  onConsult: (question?: string) => void;
+  profile: SajuProfile;
+  summary: UnifiedSajuResult | null;
+  reading: UnifiedSajuResult | null;
+  category: Category;
+  isLoading: boolean;
+  onAskDeeper: (question?: string) => void;
 }
 
-export default function ResultCard({ reading, categoryLabel, onConsult }: Props) {
-  if (!reading) return null;
+export default function ResultCard({
+  profile,
+  summary: _summary,
+  reading,
+  category,
+  isLoading,
+  onAskDeeper,
+}: Props) {
+  const didLogRef = useRef(false);
+
+  const categoryLabel = category?.titleKr || category?.titleEn || '';
+  const onConsult = onAskDeeper;
+
+  useEffect(() => {
+    if (didLogRef.current) return;
+    didLogRef.current = true;
+
+    const coreAnalysisLen =
+      reading?.analysis?.core_analysis?.filter(Boolean).length ?? 0;
+
+    console.log('[SAJU][ResultCard props]', {
+      isLoading,
+      categoryLabel,
+      hasReading: !!reading,
+      one_liner: reading?.summary?.one_liner,
+      coreAnalysisLen,
+      extended_identity: reading?.extended_identity,
+      human_type_card: reading?.human_type_card,
+      profile: {
+        birthDate: profile.birthDate,
+        birthTime: profile.birthTime,
+        calendarType: profile.calendarType,
+        gender: profile.gender,
+      },
+    });
+  }, [categoryLabel, isLoading, profile, reading]);
+
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-8 max-w-3xl mx-auto pb-20"
+      >
+        <NeonCard className="space-y-4" glowColor="secondary">
+          <div className="text-white font-semibold">분석중...</div>
+          <div className="text-sm text-text-sub">
+            잠시만 기다려. 결과를 정리하고 있다.
+          </div>
+        </NeonCard>
+      </motion.div>
+    );
+  }
+
+  if (!reading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-8 max-w-3xl mx-auto pb-20"
+      >
+        <NeonCard className="space-y-4" glowColor="secondary">
+          <div className="text-white font-semibold">데이터 없음</div>
+          <div className="text-sm text-text-sub">
+            분석 결과 데이터를 받지 못했다. 잠시 후 다시 시도해라.
+          </div>
+        </NeonCard>
+      </motion.div>
+    );
+  }
 
   const summary = reading?.summary ?? { one_liner: '' };
   const analysis = reading?.analysis ?? {
@@ -62,12 +135,28 @@ export default function ResultCard({ reading, categoryLabel, onConsult }: Props)
   const strengths = Array.isArray(humanTypeCard?.strengths) ? humanTypeCard.strengths : [];
   const weaknesses = Array.isArray(humanTypeCard?.weaknesses) ? humanTypeCard.weaknesses : [];
 
+  const hasAnyCore =
+    coreAnalysis.filter(Boolean).length > 0 ||
+    Boolean(extendedIdentity?.core_engine) ||
+    Boolean(humanTypeCard?.title);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 max-w-3xl mx-auto pb-20"
     >
+      {!hasAnyCore && (
+        <NeonCard className="space-y-3" glowColor="secondary">
+          <div className="text-white font-semibold">분석 데이터가 비어 있다</div>
+          <div className="text-sm text-text-sub">
+            응답은 받았지만, 핵심 카드에 들어갈 필드가 비어 있다. 콘솔 로그의
+            <span className="text-white/80"> [SAJU] mapped reading</span> /
+            <span className="text-white/80"> [SAJU][ResultCard props]</span> 를 확인해라.
+          </div>
+        </NeonCard>
+      )}
+
       <div className="text-center space-y-4">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}

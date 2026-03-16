@@ -91,6 +91,17 @@ export default function App() {
         console.log("CATEGORY RESULT:", result);
         console.log("SUMMARY:", result?.summary);
         console.log("ONE LINER:", result?.summary?.one_liner);
+        console.log("[SAJU] setReading about to run:", {
+          hasSummary: !!result?.summary?.one_liner,
+          core_analysis_len: result?.analysis?.core_analysis?.filter(Boolean).length ?? 0,
+          core_engine: result?.extended_identity?.core_engine,
+          thinking_style: result?.extended_identity?.thinking_style,
+          instinct_style: result?.extended_identity?.instinct_style,
+          motivation_core: result?.extended_identity?.motivation_core,
+          weakness_pattern: result?.extended_identity?.weakness_pattern,
+          relationship_pattern: result?.extended_identity?.relationship_pattern,
+          human_type_title: result?.human_type_card?.title,
+        });
 
         setReading(result);
       } catch (error: any) {

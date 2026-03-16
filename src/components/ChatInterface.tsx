@@ -92,17 +92,29 @@ export default function ChatInterface({
     try {
       const requestId = Math.random().toString(36).substring(2, 10);
 
-      const result = await chatWithSaju(
-        profile,
-        nextMessages.map((m) => ({
-          role: m.role,
-          message: m.message,
-        })),
-        text,
+      console.log("[SAJU][chat] context before chatWithSaju:", {
         sessionId,
         requestId,
+        hasSummary: !!summary,
+        hasReading: !!reading,
+        profile: {
+          birthDate: profile.birthDate,
+          birthTime: profile.birthTime,
+          calendarType: profile.calendarType,
+          gender: profile.gender,
+          mbti: profile.mbti,
+          zodiac_korean: profile.zodiac_korean,
+          enneagram: profile.enneagram,
+        },
+      });
+
+      const result = await chatWithSaju(
+        profile,
         summary,
-        reading
+        reading,
+        text,
+        sessionId,
+        requestId
       );
 
       const assistantText =

@@ -334,7 +334,7 @@ export async function generateSajuReading(
   sessionId: string,
   requestId: string
 ): Promise<UnifiedSajuResult> {
-  const fixed = await generateUnifiedSaju(profile, sessionId);
+  const fixed = await generateUnifiedSaju(profile, sessionId, requestId);
 
   if (!CATEGORY_PROMPTS[categoryId]) {
     throw new Error(`unknown categoryId: ${categoryId}`);
@@ -429,13 +429,45 @@ ${categoryPrompt}
 
   const parsed = normalizeCategoryReading(aiResult, categoryLabel);
 
-  return {
+  const mapped: UnifiedSajuResult = {
     ...fixed,
     summary: parsed.summary,
-    core_analysis: parsed.core_analysis,
-    human_structure: parsed.human_structure,
-    archetype: parsed.archetype,
+    analysis: {
+      ...fixed.analysis,
+      core_analysis: parsed.core_analysis,
+    },
+    extended_identity: {
+      ...fixed.extended_identity,
+      human_type: parsed.archetype?.title || fixed.extended_identity?.human_type || "",
+      core_engine: parsed.human_structure.core_engine,
+      thinking_style: parsed.human_structure.thinking_algorithm,
+      instinct_style: parsed.human_structure.instinct_temperament,
+      motivation_core: parsed.human_structure.motivation_core,
+      weakness_pattern: parsed.human_structure.weakness_pattern,
+      relationship_pattern: parsed.human_structure.relationship_pattern,
+    },
+    human_type_card: {
+      ...fixed.human_type_card,
+      title: parsed.archetype.title,
+      strengths: parsed.archetype.strengths,
+      weaknesses: parsed.archetype.weaknesses,
+      share_summary: parsed.archetype.description,
+    },
   };
+
+  console.log("[SAJU] mapped reading (generateSajuReading):", {
+    hasSummary: !!mapped.summary?.one_liner,
+    core_analysis_len: mapped.analysis?.core_analysis?.filter(Boolean).length ?? 0,
+    core_engine: mapped.extended_identity?.core_engine,
+    thinking_style: mapped.extended_identity?.thinking_style,
+    instinct_style: mapped.extended_identity?.instinct_style,
+    motivation_core: mapped.extended_identity?.motivation_core,
+    weakness_pattern: mapped.extended_identity?.weakness_pattern,
+    relationship_pattern: mapped.extended_identity?.relationship_pattern,
+    human_type_title: mapped.human_type_card?.title,
+  });
+
+  return mapped;
 }
 
 export async function chatWithSaju(
