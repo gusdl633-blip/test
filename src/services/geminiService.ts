@@ -5,6 +5,27 @@ import { calculateSajuFromProfile, type CalculatedSaju } from "../lib/sajuCalcul
 
 type ChatHistoryItem = { role: string; message: string };
 
+const SAJU_PERSONA_SYSTEM = `
+너는 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진이다.
+페르소나는 30대 여성 ENTP 무당이다.
+
+역할:
+- 사주 원국 계산 금지. 이미 계산된 사주 데이터를 근거로 해석 문장만 생성한다.
+
+절대 규칙:
+- 반드시 JSON만 출력한다. JSON 외 텍스트 금지.
+- pillar, elements, sinsal, badges 값 생성/수정 금지.
+- 상담사 톤 금지. 존댓말 금지. 위로/교훈/격려 금지.
+- 반말. 직설. 짧은 문장.
+- 장황한 설명 금지. 판단형 문장만 쓴다.
+- 한 문장 길이 20~40자 내외. 길면 쪼개라.
+
+문장 규칙(강제):
+- 각 배열 항목은 한 문장만 쓴다.
+- 문장은 마침표로 끝낸다.
+- 아래 표현 금지: "합니다", "있습니다", "중요합니다", "추구합니다", "할 수", "바랍니다", "응원", "괜찮", "힘든", "도움", "하세요".
+`.trim();
+
 async function callGemini<T>(payload: {
   prompt: string;
   systemInstruction: string;
@@ -52,8 +73,8 @@ function createEmptyUnifiedResult(
       birth: profile.birthDate || "",
       calendar: profile.calendarType || "",
       time: profile.birthTime || "",
-      ilgan: fixed.ilgan,
-      ilgan_display: fixed.ilgan_display,
+      ilgan: fixed.profile.ilgan,
+      ilgan_display: fixed.profile.ilgan_display,
       mbti: profile.mbti || "",
       zodiac_korean: profile.zodiac_korean || "",
       enneagram: profile.enneagram || "",
@@ -112,8 +133,8 @@ function mergeFixedSaju(
       birth: profile.birthDate || "",
       calendar: profile.calendarType || "",
       time: profile.birthTime || "",
-      ilgan: fixed.ilgan,
-      ilgan_display: fixed.ilgan_display,
+      ilgan: fixed.profile.ilgan,
+      ilgan_display: fixed.profile.ilgan_display,
       mbti: profile.mbti || "",
       zodiac_korean: profile.zodiac_korean || "",
       enneagram: profile.enneagram || "",
@@ -226,16 +247,7 @@ export async function generateUnifiedSaju(
 ): Promise<UnifiedSajuResult> {
   const fixed = await calculateSajuFromProfile(profile);
 
-  const systemInstruction = `당신은 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진, 30대 여성 ENTP 무당입니다.
-역할은 사주 원국을 계산하는 것이 아니라, 이미 계산된 사주 데이터를 바탕으로 해석 문장만 만드는 것입니다.
-
-규칙:
-- 반드시 JSON만 출력
-- pillar, elements, sinsal, badges 값은 생성하거나 수정하지 마라
-- 상담사 톤 금지
-- 반말, 직설, 짧은 문장
-- 위로 금지
-- 장황한 설명 금지`;
+  const systemInstruction = SAJU_PERSONA_SYSTEM;
 
   const prompt = `
 사용자 프로필:
@@ -263,6 +275,7 @@ ${JSON.stringify(fixed, null, 2)}
 `.trim();
 
   try {
+    console.log("[SAJU PROMPT STYLE]", { mode: "analysis", persona: "ENTP_SHAMAN" });
     const aiResult = await callGemini<Partial<UnifiedSajuResult>>({
       prompt,
       systemInstruction,
@@ -275,57 +288,217 @@ ${JSON.stringify(fixed, null, 2)}
   }
 }
 
-function normalizeCategoryReading(aiResult: any, categoryLabel: string) {
-  const summary = {
-    one_liner:
-      aiResult?.summary?.one_liner ||
-      `${categoryLabel} 기준으로 보면 지금 흐름은 분명한 방향성이 있다.`,
-    keywords: Array.isArray(aiResult?.summary?.keywords)
-      ? aiResult.summary.keywords.slice(0, 3)
-      : [categoryLabel, "흐름", "패턴"],
+function normalizeCategoryReading(aiResult: any) {
+  // Strict schema:
+  // {
+  //   analysis: [string, string, string],
+  //   structure: { coreEngine, thinkingAlgorithm, instinctTemperament, motivationCore, weaknessPattern, relationshipPattern },
+  //   humanType: { title, strengths[3], weaknesses[3], shareSummary },
+  //   evidence[3], goodFlow[3], riskSignals[3], actions[3], avoidActions[3]
+  // }
+
+  const analysis = Array.isArray(aiResult?.analysis) ? aiResult.analysis.slice(0, 3) : [];
+  const evidence = Array.isArray(aiResult?.evidence) ? aiResult.evidence.slice(0, 3) : [];
+  const goodFlow = Array.isArray(aiResult?.goodFlow) ? aiResult.goodFlow.slice(0, 3) : [];
+  const riskSignals = Array.isArray(aiResult?.riskSignals) ? aiResult.riskSignals.slice(0, 3) : [];
+  const actions = Array.isArray(aiResult?.actions) ? aiResult.actions.slice(0, 3) : [];
+  const avoidActions = Array.isArray(aiResult?.avoidActions) ? aiResult.avoidActions.slice(0, 3) : [];
+
+  const structure = {
+    coreEngine: typeof aiResult?.structure?.coreEngine === "string" ? aiResult.structure.coreEngine : "",
+    thinkingAlgorithm:
+      typeof aiResult?.structure?.thinkingAlgorithm === "string" ? aiResult.structure.thinkingAlgorithm : "",
+    instinctTemperament:
+      typeof aiResult?.structure?.instinctTemperament === "string" ? aiResult.structure.instinctTemperament : "",
+    motivationCore:
+      typeof aiResult?.structure?.motivationCore === "string" ? aiResult.structure.motivationCore : "",
+    weaknessPattern:
+      typeof aiResult?.structure?.weaknessPattern === "string" ? aiResult.structure.weaknessPattern : "",
+    relationshipPattern:
+      typeof aiResult?.structure?.relationshipPattern === "string" ? aiResult.structure.relationshipPattern : "",
   };
 
-  const core_analysis = Array.isArray(aiResult?.core_analysis)
-    ? aiResult.core_analysis.slice(0, 3)
-    : [
-        `${categoryLabel} 기준 첫 번째 핵심 흐름이 보인다.`,
-        `${categoryLabel} 기준 반복되는 패턴이 있다.`,
-        `${categoryLabel} 기준 지금 조심해야 할 지점이 분명하다.`,
-      ];
-
-  const human_structure = {
-    core_engine:
-      aiResult?.human_structure?.core_engine || "사주 구조상 기본 엔진 분석 중.",
-    thinking_algorithm:
-      aiResult?.human_structure?.thinking_algorithm || "사고 알고리즘 분석 중.",
-    instinct_temperament:
-      aiResult?.human_structure?.instinct_temperament || "기질 패턴 분석 중.",
-    motivation_core:
-      aiResult?.human_structure?.motivation_core || "동기 코어 분석 중.",
-    weakness_pattern:
-      aiResult?.human_structure?.weakness_pattern || "구조적 약점 분석 중.",
-    relationship_pattern:
-      aiResult?.human_structure?.relationship_pattern || "관계 패턴 분석 중.",
+  const humanType = {
+    title: typeof aiResult?.humanType?.title === "string" ? aiResult.humanType.title : "",
+    strengths: Array.isArray(aiResult?.humanType?.strengths) ? aiResult.humanType.strengths.slice(0, 3) : [],
+    weaknesses: Array.isArray(aiResult?.humanType?.weaknesses) ? aiResult.humanType.weaknesses.slice(0, 3) : [],
+    shareSummary:
+      typeof aiResult?.humanType?.shareSummary === "string" ? aiResult.humanType.shareSummary : "",
   };
 
-  const archetype = {
-    title: aiResult?.archetype?.title || `${categoryLabel} 중심형`,
-    description:
-      aiResult?.archetype?.description || `${categoryLabel}을 기준으로 인간 유형을 해석한 결과다.`,
-    strengths: Array.isArray(aiResult?.archetype?.strengths)
-      ? aiResult.archetype.strengths.slice(0, 3)
-      : ["집중력", "직관", "반응력"],
-    weaknesses: Array.isArray(aiResult?.archetype?.weaknesses)
-      ? aiResult.archetype.weaknesses.slice(0, 3)
-      : ["기복", "과몰입", "소진"],
-  };
+  const one_liner =
+    (typeof analysis?.[0] === "string" && analysis[0]) ||
+    (typeof humanType.shareSummary === "string" && humanType.shareSummary) ||
+    "";
 
   return {
-    summary,
-    core_analysis,
-    human_structure,
-    archetype,
+    one_liner,
+    analysis,
+    structure,
+    humanType,
+    evidence,
+    goodFlow,
+    riskSignals,
+    actions,
+    avoidActions,
   };
+}
+
+function hasForbiddenTone(text: unknown) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (!t) return false;
+  if (t.length > 60) return true;
+  const forbidden = [
+    "합니다",
+    "했습니다",
+    "있습니다",
+    "됩니다",
+    "필요합니다",
+    "바람직합니다",
+    "보입니다",
+    "경향이 있습니다",
+    "하세요",
+    "하실",
+    "괜찮",
+    "힘든",
+    "응원",
+    "바랍니다",
+    "도움",
+    "할 수",
+    "중요합니다",
+    "추구합니다",
+  ];
+  return forbidden.some((w) => t.includes(w));
+}
+
+function countForbiddenInObject(obj: any) {
+  let count = 0;
+  const visit = (v: any) => {
+    if (typeof v === "string") {
+      if (hasForbiddenTone(v)) count += 1;
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach(visit);
+      return;
+    }
+    if (v && typeof v === "object") {
+      Object.values(v).forEach(visit);
+    }
+  };
+  visit(obj);
+  return count;
+}
+
+type StrictGeminiResult = {
+  analysis: string[];
+  structure: {
+    coreEngine: string;
+    thinkingAlgorithm: string;
+    instinctTemperament: string;
+    motivationCore: string;
+    weaknessPattern: string;
+    relationshipPattern: string;
+  };
+  humanType: {
+    title: string;
+    strengths: string[];
+    weaknesses: string[];
+    shareSummary: string;
+  };
+  evidence: string[];
+  goodFlow: string[];
+  riskSignals: string[];
+  actions: string[];
+  avoidActions: string[];
+};
+
+function isNonEmptyString(v: unknown) {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function validateStrictSchema(obj: any) {
+  const issues: string[] = [];
+
+  const allowedKeys = new Set([
+    "analysis",
+    "structure",
+    "humanType",
+    "evidence",
+    "goodFlow",
+    "riskSignals",
+    "actions",
+    "avoidActions",
+  ]);
+
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    return { ok: false, issues: ["root is not an object"] };
+  }
+
+  for (const k of Object.keys(obj)) {
+    if (!allowedKeys.has(k)) issues.push(`unknown key: ${k}`);
+  }
+
+  const mustBe3Strings = (key: string) => {
+    const arr = (obj as any)[key];
+    if (!Array.isArray(arr)) {
+      issues.push(`${key} is not array`);
+      return;
+    }
+    if (arr.length !== 3) issues.push(`${key} length != 3`);
+    for (let i = 0; i < Math.min(arr.length, 3); i++) {
+      if (!isNonEmptyString(arr[i])) issues.push(`${key}[${i}] empty`);
+    }
+  };
+
+  mustBe3Strings("analysis");
+  mustBe3Strings("evidence");
+  mustBe3Strings("goodFlow");
+  mustBe3Strings("riskSignals");
+  mustBe3Strings("actions");
+  mustBe3Strings("avoidActions");
+
+  const structure = obj.structure;
+  if (!structure || typeof structure !== "object" || Array.isArray(structure)) {
+    issues.push("structure is not object");
+  } else {
+    const sKeys = [
+      "coreEngine",
+      "thinkingAlgorithm",
+      "instinctTemperament",
+      "motivationCore",
+      "weaknessPattern",
+      "relationshipPattern",
+    ] as const;
+    for (const k of sKeys) {
+      if (!isNonEmptyString(structure[k])) issues.push(`structure.${k} empty`);
+    }
+  }
+
+  const humanType = obj.humanType;
+  if (!humanType || typeof humanType !== "object" || Array.isArray(humanType)) {
+    issues.push("humanType is not object");
+  } else {
+    if (!isNonEmptyString(humanType.title)) issues.push("humanType.title empty");
+    if (!isNonEmptyString(humanType.shareSummary)) issues.push("humanType.shareSummary empty");
+
+    const validate3 = (key: "strengths" | "weaknesses") => {
+      const arr = humanType[key];
+      if (!Array.isArray(arr)) {
+        issues.push(`humanType.${key} is not array`);
+        return;
+      }
+      if (arr.length !== 3) issues.push(`humanType.${key} length != 3`);
+      for (let i = 0; i < Math.min(arr.length, 3); i++) {
+        if (!isNonEmptyString(arr[i])) issues.push(`humanType.${key}[${i}] empty`);
+      }
+    };
+    validate3("strengths");
+    validate3("weaknesses");
+  }
+
+  return { ok: issues.length === 0, issues };
 }
 
 export async function generateSajuReading(
@@ -362,12 +535,12 @@ ${JSON.stringify(
   {
     pillar: fixed.pillar,
     elements: fixed.elements,
-    hidden_elements: fixed.hidden_elements,
-    visible_ten_gods: fixed.visible_ten_gods,
-    hidden_ten_gods: fixed.hidden_ten_gods,
+    hidden_elements: (fixed as any).hidden_elements,
+    visible_ten_gods: (fixed as any).visible_ten_gods,
+    hidden_ten_gods: (fixed as any).hidden_ten_gods,
     badges: fixed.badges,
     sinsal: fixed.sinsal,
-    daewoon: fixed.daewoon,
+    daewoon: (fixed as any).daewoon,
   },
   null,
   2
@@ -386,72 +559,113 @@ ${categoryPrompt}
 2. 사주 원 데이터(pillar, elements, badges 등)는 절대 바꾸지 마라.
 3. 결과 JSON만 반환해라.
 4. 아래 JSON 스키마를 반드시 지켜라.
-5. summary.one_liner, core_analysis, human_structure, archetype 모두 채워라.
+5. 모든 섹션을 비우지 마라. 전부 채워라.
 6. 내용이 비어 있으면 안 된다.
 7. 직설적이고 간결하게 써라.
 
-반환 JSON 스키마:
+반환 JSON 스키마(이 구조만 반환):
 {
-  "summary": {
-    "one_liner": "한 줄 요약",
-    "keywords": ["키워드1", "키워드2", "키워드3"]
+  "analysis": ["string", "string", "string"],
+  "structure": {
+    "coreEngine": "string",
+    "thinkingAlgorithm": "string",
+    "instinctTemperament": "string",
+    "motivationCore": "string",
+    "weaknessPattern": "string",
+    "relationshipPattern": "string"
   },
-  "core_analysis": [
-    "핵심 분석 1",
-    "핵심 분석 2",
-    "핵심 분석 3"
-  ],
-  "human_structure": {
-    "core_engine": "사주 기반 핵심 구조 설명",
-    "thinking_algorithm": "MBTI 기반 사고 방식 설명",
-    "instinct_temperament": "별자리 기반 기질 설명",
-    "motivation_core": "에니어그램 기반 동기 설명",
-    "weakness_pattern": "구조적 약점 설명",
-    "relationship_pattern": "관계 방식 설명"
+  "humanType": {
+    "title": "string",
+    "strengths": ["string","string","string"],
+    "weaknesses": ["string","string","string"],
+    "shareSummary": "string"
   },
-  "archetype": {
-    "title": "인간 유형 이름",
-    "description": "유형 설명",
-    "strengths": ["강점1", "강점2", "강점3"],
-    "weaknesses": ["약점1", "약점2", "약점3"]
-  }
+  "evidence": ["string","string","string"],
+  "goodFlow": ["string","string","string"],
+  "riskSignals": ["string","string","string"],
+  "actions": ["string","string","string"],
+  "avoidActions": ["string","string","string"]
 }
 `.trim();
 
-  const aiResult = await callGemini<any>({
+  console.log("[SAJU PROMPT STYLE]", { mode: "analysis", persona: "ENTP_SHAMAN" });
+  let aiResult = await callGemini<any>({
     prompt,
-    systemInstruction:
-      "너는 한국어로만 답하는 사주 분석 엔진이다. JSON 외 텍스트를 절대 섞지 마라.",
+    systemInstruction: SAJU_PERSONA_SYSTEM,
     history: [],
   });
 
+  const toneForbiddenCount = countForbiddenInObject(aiResult);
+  const schemaCheck = validateStrictSchema(aiResult);
+
+  if (toneForbiddenCount > 0 || !schemaCheck.ok) {
+    console.warn("[SAJU][retry] violations detected, retrying once", {
+      toneForbiddenCount,
+      schemaOk: schemaCheck.ok,
+      schemaIssues: schemaCheck.issues.slice(0, 12),
+    });
+    aiResult = await callGemini<any>({
+      prompt: `${prompt}
+
+규칙 위반했다.
+- 같은 JSON 스키마 그대로 다시 반환.
+- 키 이름 바꾸지 마라.
+- 모든 배열은 3개로 채워라. 빈 문자열 금지.
+- structure/humanType 모든 필드 채워라. 빈 문자열 금지.
+- 존댓말/설명체/위로체 금지. "~합니다/~있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 금지.
+`.trim(),
+      systemInstruction: SAJU_PERSONA_SYSTEM,
+      history: [],
+    });
+  }
+
   console.log("AI RESULT:", aiResult);
 
-  const parsed = normalizeCategoryReading(aiResult, categoryLabel);
+  const finalToneForbiddenCount = countForbiddenInObject(aiResult);
+  const finalSchemaCheck = validateStrictSchema(aiResult);
+  if (finalToneForbiddenCount > 0 || !finalSchemaCheck.ok) {
+    console.error("[SAJU][retry] still invalid after retry", {
+      finalToneForbiddenCount,
+      schemaOk: finalSchemaCheck.ok,
+      schemaIssues: finalSchemaCheck.issues.slice(0, 20),
+    });
+    throw new Error(
+      `Gemini result invalid (tone/schema). issues=${finalSchemaCheck.issues.slice(0, 10).join("; ")}`
+    );
+  }
+
+  const parsed = normalizeCategoryReading(aiResult);
 
   const mapped: UnifiedSajuResult = {
     ...fixed,
-    summary: parsed.summary,
+    summary: {
+      ...fixed.summary,
+      one_liner: parsed.one_liner,
+    },
     analysis: {
       ...fixed.analysis,
-      core_analysis: parsed.core_analysis,
+      core_analysis: parsed.analysis,
+      logic_basis: parsed.evidence,
+      good_flow: parsed.goodFlow,
+      risk_flow: parsed.riskSignals,
+      action_now: parsed.actions,
+      avoid_action: parsed.avoidActions,
     },
     extended_identity: {
       ...fixed.extended_identity,
-      human_type: parsed.archetype?.title || fixed.extended_identity?.human_type || "",
-      core_engine: parsed.human_structure.core_engine,
-      thinking_style: parsed.human_structure.thinking_algorithm,
-      instinct_style: parsed.human_structure.instinct_temperament,
-      motivation_core: parsed.human_structure.motivation_core,
-      weakness_pattern: parsed.human_structure.weakness_pattern,
-      relationship_pattern: parsed.human_structure.relationship_pattern,
+      core_engine: parsed.structure.coreEngine,
+      thinking_style: parsed.structure.thinkingAlgorithm,
+      instinct_style: parsed.structure.instinctTemperament,
+      motivation_core: parsed.structure.motivationCore,
+      weakness_pattern: parsed.structure.weaknessPattern,
+      relationship_pattern: parsed.structure.relationshipPattern,
     },
     human_type_card: {
       ...fixed.human_type_card,
-      title: parsed.archetype.title,
-      strengths: parsed.archetype.strengths,
-      weaknesses: parsed.archetype.weaknesses,
-      share_summary: parsed.archetype.description,
+      title: parsed.humanType.title,
+      strengths: parsed.humanType.strengths,
+      weaknesses: parsed.humanType.weaknesses,
+      share_summary: parsed.humanType.shareSummary,
     },
   };
 
@@ -478,7 +692,7 @@ export async function chatWithSaju(
   sessionId: string,
   requestId: string
 ): Promise<UnifiedSajuResult> {
-  const fixed = summary ?? (await generateUnifiedSaju(profile, sessionId));
+  const fixed = summary ?? (await generateUnifiedSaju(profile, sessionId, requestId));
 
   const prompt = `
 너는 사주 기반 상담 엔진이다.
@@ -494,12 +708,12 @@ ${JSON.stringify(
   {
     pillar: fixed.pillar,
     elements: fixed.elements,
-    hidden_elements: fixed.hidden_elements,
-    visible_ten_gods: fixed.visible_ten_gods,
-    hidden_ten_gods: fixed.hidden_ten_gods,
+    hidden_elements: (fixed as any).hidden_elements,
+    visible_ten_gods: (fixed as any).visible_ten_gods,
+    hidden_ten_gods: (fixed as any).hidden_ten_gods,
     badges: fixed.badges,
     sinsal: fixed.sinsal,
-    daewoon: fixed.daewoon,
+    daewoon: (fixed as any).daewoon,
   },
   null,
   2
@@ -514,47 +728,115 @@ ${userInput}
 반드시 한국어로만 답해라.
 JSON만 반환해라.
 
-반환 JSON 스키마:
+반환 JSON 스키마(이 구조만 반환):
 {
-  "summary": {
-    "one_liner": "질문에 대한 한 줄 답"
+  "analysis": ["string", "string", "string"],
+  "structure": {
+    "coreEngine": "string",
+    "thinkingAlgorithm": "string",
+    "instinctTemperament": "string",
+    "motivationCore": "string",
+    "weaknessPattern": "string",
+    "relationshipPattern": "string"
   },
-  "core_analysis": [
-    "답변 1",
-    "답변 2",
-    "답변 3"
-  ],
-  "human_structure": {
-    "core_engine": "사주 기반 설명",
-    "thinking_algorithm": "MBTI 기반 설명",
-    "instinct_temperament": "별자리 기반 설명",
-    "motivation_core": "에니어그램 기반 설명",
-    "weakness_pattern": "구조적 약점 설명",
-    "relationship_pattern": "관계 패턴 설명"
+  "humanType": {
+    "title": "string",
+    "strengths": ["string","string","string"],
+    "weaknesses": ["string","string","string"],
+    "shareSummary": "string"
   },
-  "archetype": {
-    "title": "유형 이름",
-    "description": "유형 설명",
-    "strengths": ["강점1", "강점2", "강점3"],
-    "weaknesses": ["약점1", "약점2", "약점3"]
-  }
+  "evidence": ["string","string","string"],
+  "goodFlow": ["string","string","string"],
+  "riskSignals": ["string","string","string"],
+  "actions": ["string","string","string"],
+  "avoidActions": ["string","string","string"]
 }
 `.trim();
 
-  const aiResult = await callGemini<any>({
+  console.log("[SAJU PROMPT STYLE]", { mode: "chat", persona: "ENTP_SHAMAN" });
+  let aiResult = await callGemini<any>({
     prompt,
-    systemInstruction:
-      "너는 한국어로만 답하는 사주 상담 엔진이다. JSON 외 텍스트를 절대 섞지 마라.",
+    systemInstruction: SAJU_PERSONA_SYSTEM,
     history: [],
   });
 
-  const parsed = normalizeCategoryReading(aiResult, "상담");
+  const toneForbiddenCount = countForbiddenInObject(aiResult);
+  const schemaCheck = validateStrictSchema(aiResult);
 
-  return {
+  if (toneForbiddenCount > 0 || !schemaCheck.ok) {
+    console.warn("[SAJU][retry][chat] violations detected, retrying once", {
+      toneForbiddenCount,
+      schemaOk: schemaCheck.ok,
+      schemaIssues: schemaCheck.issues.slice(0, 12),
+    });
+    aiResult = await callGemini<any>({
+      prompt: `${prompt}
+
+규칙 위반했다.
+- 같은 JSON 스키마 그대로 다시 반환.
+- 키 이름 바꾸지 마라.
+- 모든 배열은 3개로 채워라. 빈 문자열 금지.
+- structure/humanType 모든 필드 채워라. 빈 문자열 금지.
+- 존댓말/설명체/위로체 금지. "~합니다/~있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 금지.
+`.trim(),
+      systemInstruction: SAJU_PERSONA_SYSTEM,
+      history: [],
+    });
+  }
+
+  const parsed = normalizeCategoryReading(aiResult);
+
+  const finalToneForbiddenCount = countForbiddenInObject(aiResult);
+  const finalSchemaCheck = validateStrictSchema(aiResult);
+  if (finalToneForbiddenCount > 0 || !finalSchemaCheck.ok) {
+    console.error("[SAJU][retry][chat] still invalid after retry", {
+      finalToneForbiddenCount,
+      schemaOk: finalSchemaCheck.ok,
+      schemaIssues: finalSchemaCheck.issues.slice(0, 20),
+    });
+    throw new Error(
+      `Gemini chat result invalid (tone/schema). issues=${finalSchemaCheck.issues.slice(0, 10).join("; ")}`
+    );
+  }
+
+  const mapped: UnifiedSajuResult = {
     ...fixed,
-    summary: parsed.summary,
-    core_analysis: parsed.core_analysis,
-    human_structure: parsed.human_structure,
-    archetype: parsed.archetype,
+    summary: {
+      ...fixed.summary,
+      one_liner: parsed.one_liner,
+    },
+    analysis: {
+      ...fixed.analysis,
+      core_analysis: parsed.analysis,
+      logic_basis: parsed.evidence,
+      good_flow: parsed.goodFlow,
+      risk_flow: parsed.riskSignals,
+      action_now: parsed.actions,
+      avoid_action: parsed.avoidActions,
+    },
+    extended_identity: {
+      ...fixed.extended_identity,
+      core_engine: parsed.structure.coreEngine,
+      thinking_style: parsed.structure.thinkingAlgorithm,
+      instinct_style: parsed.structure.instinctTemperament,
+      motivation_core: parsed.structure.motivationCore,
+      weakness_pattern: parsed.structure.weaknessPattern,
+      relationship_pattern: parsed.structure.relationshipPattern,
+    },
+    human_type_card: {
+      ...fixed.human_type_card,
+      title: parsed.humanType.title,
+      strengths: parsed.humanType.strengths,
+      weaknesses: parsed.humanType.weaknesses,
+      share_summary: parsed.humanType.shareSummary,
+    },
   };
+
+  console.log("[SAJU][chat] mapped result:", {
+    one_liner: mapped.summary?.one_liner,
+    core_analysis_len: mapped.analysis?.core_analysis?.filter(Boolean).length ?? 0,
+    core_engine: mapped.extended_identity?.core_engine,
+  });
+
+  return mapped;
 }
