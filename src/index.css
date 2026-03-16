@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-bg-start: #05070A;
+  --color-bg-end: #0B1220;
+  --color-neon-primary: #00FF9C;
+  --color-neon-secondary: #5BE1FF;
+  --color-accent: #FF8A3D;
+  --color-text-main: #E6F1FF;
+  --color-text-sub: #7B8CA3;
+}
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-bg-start to-bg-end text-text-main font-sans antialiased min-h-screen selection:bg-neon-primary/30;
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.3)];
+  }
+
+  .neon-glow-primary {
+    @apply shadow-[0_0_20px_rgba(0,255,156,0.15)];
+  }
+
+  .neon-glow-secondary {
+    @apply shadow-[0_0_20px_rgba(91,225,255,0.15)];
+  }
+
+  .neon-border-primary {
+    @apply border border-neon-primary/30;
+  }
+
+  .neon-border-secondary {
+    @apply border border-neon-secondary/30;
+  }
+}
+
+/* Radial Neon Background */
+.radial-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 255, 156, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
