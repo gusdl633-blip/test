@@ -7,19 +7,19 @@ import { FORTUNE_CATEGORIES, type FortuneCategoryId } from "../constants/fortune
 type ChatHistoryItem = { role: string; message: string };
 
 const SAJU_PERSONA_SYSTEM = `
-너는 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진이다. 30대 여성 ENTP 무당 캐릭터다.
+"천명(天命) FUTURISTIC SAJU" 전용 분석 엔진이다. 30대 여성 ENTP 무당 캐릭터다.
 역할: 사주 원국 계산 금지. 이미 계산된 사주 데이터를 근거로 해석 문장만 만든다.
 
 절대 규칙:
 - JSON만 출력. pillar, elements, sinsal, badges 생성/수정 금지.
 - 반말만. 존댓말·상담사 톤·위로·교훈·격려 금지.
 - 설명 금지. 분석 리포트 톤 금지. 중립적 서술 금지.
-- "너"한테 직접 말하듯이 써라. 말하듯이 끊어라.
+- 문장에서 "너", "너는", "너가", "너 지금" 사용 금지. 주어 생략한 직설체로 써라.
 - 한 문장 = 한 방. 직설. 날카롭게. 판단·긴장·모순 있어도 됨.
 
 문장 스타일(강제):
-- 주어 넣어라: "너", "지금 상태", "이 흐름".
-- 좋은 예: "너 지금 변화 욕구 터진 상태다." "너 감정 표현 안 한다. 그래서 관계 오래 못 간다." "너 구속 들어오면 바로 답답해한다."
+- 주어 생략 또는 "지금 상태", "이 흐름" 등 중립 표현만. "너"로 시작하는 문장 금지.
+- 좋은 예: "지금 머릿속은 정리 안 된 상태다." "감정이 쌓이면 바로 밖으로 터진다." "구속 들어오면 답답해한다."
 - 금지: "~하는 시기다", "~경향이 있다", "~문제가 발생한다", "~영향을 준다", "~추구하는 성향이다", "~부족하다" (단독). "합니다/있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 전부 금지.
 `.trim();
 
@@ -269,15 +269,19 @@ function buildCategoryPrompt(
       return {
         label,
         prompt:
-          "2026년 운세를 뽑아라. 2026 전체 흐름, 강해지는 영역, 깨지는 패턴, 밀어붙여도 되는 것, 절대 하지 말아야 할 것을 직설로 정리해라. 좋게 말하지 마라. 경고는 경고로 박아라.",
+          "2026년 운세를 뽑아라. 2026 전체 흐름, 강해지는 영역, 깨지는 패턴, 밀어붙여도 되는 것, 절대 하지 말아야 할 것을 직설로 정리해라. " +
+          "문장에 '너' 넣지 마라. 주어 생략·직설·예측 톤. 좋게 말하지 마라. 경고는 경고로 박아라.",
       };
     case "today": {
-      const zodiac = fixed.profile?.zodiac_korean ? `(${fixed.profile.zodiac_korean})` : "";
+      const zodiac = fixed.profile?.zodiac_korean ?? "";
+      const mbti = fixed.profile?.mbti ?? "";
+      const enneagram = fixed.profile?.enneagram ?? "";
+      const priority = [zodiac && "별자리", mbti && "MBTI", enneagram && "에니어그램"].filter(Boolean).join("·") || "사주 요약";
       return {
         label,
         prompt:
-          `오늘의 운세를 뽑아라 ${zodiac}. 우선순위: 1) 별자리 2) 확정 사주 구조 3) 현재 요약. ` +
-          "오늘 감정 흐름, 오늘 피해야 할 행동, 오늘 밀어붙여도 되는 행동, 한줄 결론. 짧고 뾰족하게. 변명 금지.",
+          `오늘의 운세. 우선순위: 1) 별자리${zodiac ? ` (${zodiac})` : ""} 2) 프로필(MBTI, 에니어그램) 3) 사주 요약. 절대 빈 결과 금지. ` +
+          "오늘 감정 흐름, 오늘 피해야 할 행동, 오늘 밀어붙여도 되는 행동, 한줄 결론. 문장에 '너' 넣지 마라. 주어 생략·직설. 짧고 뾰족하게.",
       };
     }
     case "overall":
@@ -792,6 +796,42 @@ function isRecoverableSchema(obj: unknown): boolean {
   );
 }
 
+/** Hard fallback for "today" category so result is never empty. */
+function normalizeToday(result: UnifiedSajuResult): UnifiedSajuResult {
+  const a = result?.analysis;
+  return {
+    ...result,
+    summary: {
+      ...result.summary,
+      one_liner:
+        (result?.summary?.one_liner ?? "").trim() || "오늘은 방향보다 선택이 중요하다.",
+    },
+    analysis: {
+      ...a,
+      core_analysis:
+        Array.isArray(a?.core_analysis) && a.core_analysis.some((s) => String(s).trim())
+          ? a.core_analysis
+          : ["흐름은 빠르지만 집중이 분산된다."],
+      good_flow:
+        Array.isArray(a?.good_flow) && a.good_flow.some((s) => String(s).trim())
+          ? a.good_flow
+          : ["기회는 빠르게 잡힌다."],
+      risk_flow:
+        Array.isArray(a?.risk_flow) && a.risk_flow.some((s) => String(s).trim())
+          ? a.risk_flow
+          : ["충동 결정 가능성 높다."],
+      action_now:
+        Array.isArray(a?.action_now) && a.action_now.some((s) => String(s).trim())
+          ? a.action_now
+          : ["지금 시작하는 게 맞다."],
+      avoid_action:
+        Array.isArray(a?.avoid_action) && a.avoid_action.some((s) => String(s).trim())
+          ? a.avoid_action
+          : ["불필요한 감정 소비 피해야 한다."],
+    },
+  };
+}
+
 export async function generateSajuReading(
   profile: SajuProfile,
   categoryId: string,
@@ -807,7 +847,7 @@ export async function generateSajuReading(
   console.log("FIXED SAJU:", fixed);
 
   const prompt = `
-너는 사주 기반 인간 패턴 해석 시스템이다.
+사주 기반 인간 패턴 해석 시스템이다.
 
 아래는 이미 확정된 사용자 사주/성향 데이터다.
 이 값을 바꾸지 말고, 그대로 근거로만 사용해라.
@@ -846,7 +886,7 @@ ${categoryPrompt}
 4. 아래 JSON 스키마를 반드시 지켜라.
 5. 모든 섹션을 비우지 마라. 전부 채워라.
 6. 내용이 비어 있으면 안 된다.
-7. 문장 스타일: "너"한테 말하듯이. 한 문장에 주어(너/지금 상태/이 흐름) 넣어라. "~하는 시기다" "~경향이 있다" "~문제가 발생한다" 금지. "지금 ~다" "너 ~한다" "~ 때문에 꼬인다" 써라.
+7. 문장 스타일: "너", "너는", "너가" 금지. 주어 생략한 직설체. "~하는 시기다" "~경향이 있다" "~문제가 발생한다" 금지. "지금 ~다" "~ 때문에 꼬인다" 써라.
 
 반환 JSON 스키마(이 구조만 반환):
 {
@@ -887,7 +927,10 @@ ${categoryPrompt}
     throw err;
   }
 
-  const mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
+  let mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
+  if (categoryId === "today") {
+    mapped = normalizeToday(mapped);
+  }
 
   console.log("[SAJU] mapped reading (generateSajuReading):", {
     hasSummary: !!mapped.summary?.one_liner,
@@ -915,7 +958,7 @@ export async function chatWithSaju(
   const fixed = summary ?? (await generateUnifiedSaju(profile, sessionId, requestId));
 
   const prompt = `
-너는 사주 기반 상담 엔진이다.
+사주 기반 상담 엔진이다.
 
 아래는 이미 확정된 사용자 데이터다.
 절대 바꾸지 말고, 이 값을 근거로만 답해라.
@@ -946,7 +989,7 @@ ${JSON.stringify(reading ?? {}, null, 2)}
 ${userInput}
 
 반드시 한국어로만 답해라. JSON만 반환해라.
-문장 스타일: "너"한테 말하듯이. 한 문장에 주어 넣어라. "~하는 시기다" "~경향이 있다" "~문제가 발생한다" 금지. "지금 ~다" "너 ~한다" 써라.
+문장 스타일: "너", "너는", "너가" 금지. 주어 생략한 직설체. "~하는 시기다" "~경향이 있다" 금지. "지금 ~다" 써라.
 
 반환 JSON 스키마(이 구조만 반환):
 {

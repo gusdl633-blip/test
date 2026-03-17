@@ -19,19 +19,24 @@ interface Props {
   summary: UnifiedSajuResult | null;
   reading: UnifiedSajuResult | null;
   category: Category;
+  categoryId?: string | null;
   isLoading: boolean;
   onAskDeeper: (question?: string) => void;
 }
+
+const FALLBACK = { line: "흐름을 읽는 게 먼저다.", label: "—" };
 
 export default function ResultCard({
   profile,
   summary: _summary,
   reading,
   category,
+  categoryId = null,
   isLoading,
   onAskDeeper,
 }: Props) {
   const didLogRef = useRef(false);
+  const isToday = categoryId === "today";
 
   const categoryLabel = category?.titleKr || category?.titleEn || '';
   const onConsult = onAskDeeper;
@@ -85,9 +90,9 @@ export default function ResultCard({
         className="space-y-8 max-w-3xl mx-auto pb-20"
       >
         <NeonCard className="space-y-4" glowColor="secondary">
-          <div className="text-white font-semibold">데이터 없음</div>
+          <div className="text-white font-semibold">결과 없음</div>
           <div className="text-sm text-text-sub">
-            분석 결과 데이터를 받지 못했다. 잠시 후 다시 시도해라.
+            분석 결과를 받지 못했다. 잠시 후 다시 시도해라.
           </div>
         </NeonCard>
       </motion.div>
@@ -126,14 +131,14 @@ export default function ResultCard({
     ? reading.chat_seed_questions
     : [];
 
-  const coreAnalysis = Array.isArray(analysis?.core_analysis) ? analysis.core_analysis : [];
-  const logicBasis = Array.isArray(analysis?.logic_basis) ? analysis.logic_basis : [];
-  const goodFlow = Array.isArray(analysis?.good_flow) ? analysis.good_flow : [];
-  const riskFlow = Array.isArray(analysis?.risk_flow) ? analysis.risk_flow : [];
-  const actionNow = Array.isArray(analysis?.action_now) ? analysis.action_now : [];
-  const avoidAction = Array.isArray(analysis?.avoid_action) ? analysis.avoid_action : [];
-  const strengths = Array.isArray(humanTypeCard?.strengths) ? humanTypeCard.strengths : [];
-  const weaknesses = Array.isArray(humanTypeCard?.weaknesses) ? humanTypeCard.weaknesses : [];
+  const coreAnalysis = (reading?.analysis?.core_analysis ?? []) as string[];
+  const logicBasis = (reading?.analysis?.logic_basis ?? []) as string[];
+  const goodFlow = (reading?.analysis?.good_flow ?? []) as string[];
+  const riskFlow = (reading?.analysis?.risk_flow ?? []) as string[];
+  const actionNow = (reading?.analysis?.action_now ?? []) as string[];
+  const avoidAction = (reading?.analysis?.avoid_action ?? []) as string[];
+  const strengths = (reading?.human_type_card?.strengths ?? []) as string[];
+  const weaknesses = (reading?.human_type_card?.weaknesses ?? []) as string[];
 
   const hasAnyCore =
     coreAnalysis.filter(Boolean).length > 0 ||
@@ -254,9 +259,11 @@ export default function ResultCard({
               핵심 분석
             </h3>
 
+            {!isToday && (
             <div className="px-3 py-1 bg-neon-primary/10 border border-neon-primary/30 rounded-lg text-[10px] font-bold text-neon-primary uppercase tracking-wider">
-              {extendedIdentity?.human_type?.trim() || '데이터 없음'}
+              {extendedIdentity?.human_type?.trim() || FALLBACK.label}
             </div>
+            )}
           </div>
 
           <div className="grid gap-4">
@@ -275,12 +282,14 @@ export default function ResultCard({
               ))
             ) : (
               <div className="p-6 bg-white/5 border border-white/5 rounded-2xl text-text-sub text-sm">
-                데이터 없음
+                {FALLBACK.line}
               </div>
             )}
           </div>
         </section>
 
+        {!isToday && (
+        <>
         {/* Section: 인간 구조 분석 */}
         <section className="pt-10 border-t border-white/5">
           <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] mb-6 flex items-center">
@@ -294,7 +303,7 @@ export default function ResultCard({
                 Core Engine (사주)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.core_engine?.trim() || '데이터 없음'}
+                {extendedIdentity?.core_engine?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -303,7 +312,7 @@ export default function ResultCard({
                 Thinking Algorithm (MBTI)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.thinking_style?.trim() || '데이터 없음'}
+                {extendedIdentity?.thinking_style?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -312,7 +321,7 @@ export default function ResultCard({
                 Instinct Temperament (별자리)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.instinct_style?.trim() || '데이터 없음'}
+                {extendedIdentity?.instinct_style?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -321,7 +330,7 @@ export default function ResultCard({
                 Motivation Core (애니어그램)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.motivation_core?.trim() || '데이터 없음'}
+                {extendedIdentity?.motivation_core?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -330,7 +339,7 @@ export default function ResultCard({
                 Weakness Pattern (구조적 결함)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.weakness_pattern?.trim() || '데이터 없음'}
+                {extendedIdentity?.weakness_pattern?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -339,7 +348,7 @@ export default function ResultCard({
                 Relationship Pattern (관계 방식)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.relationship_pattern?.trim() || '데이터 없음'}
+                {extendedIdentity?.relationship_pattern?.trim() || FALLBACK.label}
               </div>
             </div>
 
@@ -368,7 +377,7 @@ export default function ResultCard({
           <div className="bg-gradient-to-br from-neon-secondary/10 to-neon-primary/10 border border-white/10 rounded-3xl p-8 space-y-8">
             <div className="text-center space-y-2">
               <div className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                {humanTypeCard?.title?.trim() || '데이터 없음'}
+                {humanTypeCard?.title?.trim() || FALLBACK.label}
               </div>
 
               <p className="text-sm text-text-sub/70 italic">
@@ -391,7 +400,7 @@ export default function ResultCard({
                       </li>
                     ))
                   ) : (
-                    <li className="text-sm text-text-sub">데이터 없음</li>
+                    <li className="text-sm text-text-sub">{FALLBACK.line}</li>
                   )}
                 </ul>
               </div>
@@ -410,7 +419,7 @@ export default function ResultCard({
                       </li>
                     ))
                   ) : (
-                    <li className="text-sm text-text-sub">데이터 없음</li>
+                    <li className="text-sm text-text-sub">{FALLBACK.line}</li>
                   )}
                 </ul>
               </div>
@@ -434,10 +443,12 @@ export default function ResultCard({
                 </div>
               ))
             ) : (
-              <div className="text-sm text-text-sub">데이터 없음</div>
+              <div className="text-sm text-text-sub">{FALLBACK.line}</div>
             )}
           </div>
         </section>
+        </>
+        )}
 
         {/* Section 3: 좋은 흐름 / 위험 신호 */}
         <div className="grid md:grid-cols-2 gap-6 pt-10 border-t border-white/5">
@@ -455,7 +466,7 @@ export default function ResultCard({
                   </li>
                 ))
               ) : (
-                <li className="text-text-sub">데이터 없음</li>
+                <li className="text-text-sub">{FALLBACK.line}</li>
               )}
             </ul>
           </section>
@@ -466,16 +477,27 @@ export default function ResultCard({
             </h3>
 
             <ul className="space-y-3 text-sm text-text-main/90">
-              {riskFlow.length > 0 ? (
-                riskFlow.map((item, i) => (
-                  <li key={i} className="flex items-start">
-                    <span className="text-accent mr-2">•</span>
-                    {item}
-                  </li>
-                ))
-              ) : (
-                <li className="text-text-sub">데이터 없음</li>
-              )}
+              {(goodFlow.length > 0 ? goodFlow : [FALLBACK.line]).map((item, i) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-neon-primary mr-2">•</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="bg-accent/5 p-6 rounded-2xl border border-accent/20">
+            <h3 className="flex items-center text-sm font-bold text-accent mb-4">
+              <AlertTriangle className="w-4 h-4 mr-2" /> 위험 신호
+            </h3>
+
+            <ul className="space-y-3 text-sm text-text-main/90">
+              {(riskFlow.length > 0 ? riskFlow : [FALLBACK.line]).map((item, i) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-accent mr-2">•</span>
+                  {item}
+                </li>
+              ))}
             </ul>
           </section>
         </div>
