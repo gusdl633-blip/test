@@ -140,12 +140,83 @@ export default function ResultCard({
     Boolean(extendedIdentity?.core_engine) ||
     Boolean(humanTypeCard?.title);
 
+  const orig = reading.original ?? reading;
+  const pillar = orig.pillar ?? { year: "", month: "", day: "", hour: "" };
+  const elements = orig.elements ?? { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 };
+  const sinsal = orig.sinsal ?? [];
+  const badges = orig.badges ?? { ilgan: "", strength: "", yongsin: "", gisin: "", core_pattern: "" };
+
+  const elementColors: Record<string, string> = {
+    wood: "bg-green-500/20 text-green-400 border-green-500/30",
+    fire: "bg-red-500/20 text-red-400 border-red-500/30",
+    earth: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    metal: "bg-gray-400/20 text-gray-300 border-gray-400/30",
+    water: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  };
+  const elementLabels: Record<string, string> = { wood: "木", fire: "火", earth: "土", metal: "金", water: "水" };
+  const pillarKeys = [{ key: "year" as const, label: "년주" }, { key: "month" as const, label: "월주" }, { key: "day" as const, label: "일주" }, { key: "hour" as const, label: "시주" }];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 max-w-3xl mx-auto pb-20"
     >
+      <NeonCard className="space-y-6" glowColor="secondary">
+        <h3 className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center">
+          <div className="w-8 h-[1px] bg-neon-secondary/50 mr-3" />
+          사주 원국 (계산값)
+        </h3>
+        <div className="grid grid-cols-4 gap-3">
+          {pillarKeys.map(({ key, label }) => (
+            <div key={key} className="flex flex-col items-center gap-1">
+              <span className="text-[9px] text-text-sub uppercase opacity-60">{label}</span>
+              <div className="w-full min-h-[52px] flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white font-bold tracking-widest">
+                {pillar[key] || "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          {(["wood", "fire", "earth", "metal", "water"] as const).map((el) => (
+            <div key={el} className="space-y-1">
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className={`h-full max-w-full ${elementColors[el].split(" ")[0]}`}
+                  style={{ width: `${((elements[el] ?? 0) / 8) * 100}%` }}
+                />
+              </div>
+              <div className={`px-1.5 py-1 rounded-md border text-[10px] font-bold flex justify-between ${elementColors[el]}`}>
+                <span>{elementLabels[el]}</span>
+                <span>{elements[el] ?? 0}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="text-[10px] text-text-sub uppercase">일간</span>
+          <span className="text-xs font-bold text-neon-primary">{badges.ilgan || "—"}</span>
+          <span className="text-[10px] text-text-sub uppercase ml-2">강약</span>
+          <span className="text-xs font-bold text-neon-primary">{badges.strength || "—"}</span>
+          <span className="text-[10px] text-text-sub uppercase ml-2">용신</span>
+          <span className="text-xs font-bold text-neon-primary">{badges.yongsin || "—"}</span>
+          <span className="text-[10px] text-text-sub uppercase ml-2">기신</span>
+          <span className="text-xs font-bold text-neon-primary">{badges.gisin || "—"}</span>
+          <span className="text-[10px] text-text-sub uppercase ml-2">핵심격</span>
+          <span className="text-xs font-bold text-neon-primary">{badges.core_pattern || "—"}</span>
+        </div>
+        {sinsal.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-[10px] text-text-sub uppercase">신살</span>
+            {sinsal.filter(Boolean).map((item) => (
+              <span key={item} className="px-2 py-0.5 rounded-md bg-neon-primary/10 text-neon-primary text-[10px] border border-neon-primary/20 font-medium">
+                {item}
+              </span>
+            ))}
+          </div>
+        )}
+      </NeonCard>
+
       {!hasAnyCore && (
         <NeonCard className="space-y-3" glowColor="secondary">
           <div className="text-white font-semibold">분석 데이터가 비어 있다</div>

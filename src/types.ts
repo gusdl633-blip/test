@@ -75,6 +75,13 @@ export interface UnifiedSajuResult {
     share_summary: string;
   };
   chat_seed_questions: string[];
+  /** Calculated saju only (pillar/elements/sinsal/badges). Not from Gemini. */
+  original?: {
+    pillar: { year: string; month: string; day: string; hour: string };
+    elements: { wood: number; fire: number; earth: number; metal: number; water: number };
+    sinsal: string[];
+    badges: { ilgan: string; strength: string; yongsin: string; gisin: string; core_pattern: string };
+  };
 }
 
 export const CATEGORIES = [

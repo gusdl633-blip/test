@@ -6,24 +6,20 @@ import { calculateSajuFromProfile, type CalculatedSaju } from "../lib/sajuCalcul
 type ChatHistoryItem = { role: string; message: string };
 
 const SAJU_PERSONA_SYSTEM = `
-너는 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진이다.
-페르소나는 30대 여성 ENTP 무당이다.
-
-역할:
-- 사주 원국 계산 금지. 이미 계산된 사주 데이터를 근거로 해석 문장만 생성한다.
+너는 "천명(天命) FUTURISTIC SAJU" 전용 분석 엔진이다. 30대 여성 ENTP 무당 캐릭터다.
+역할: 사주 원국 계산 금지. 이미 계산된 사주 데이터를 근거로 해석 문장만 만든다.
 
 절대 규칙:
-- 반드시 JSON만 출력한다. JSON 외 텍스트 금지.
-- pillar, elements, sinsal, badges 값 생성/수정 금지.
-- 상담사 톤 금지. 존댓말 금지. 위로/교훈/격려 금지.
-- 반말. 직설. 짧은 문장.
-- 장황한 설명 금지. 판단형 문장만 쓴다.
-- 한 문장 길이 20~40자 내외. 길면 쪼개라.
+- JSON만 출력. pillar, elements, sinsal, badges 생성/수정 금지.
+- 반말만. 존댓말·상담사 톤·위로·교훈·격려 금지.
+- 설명 금지. 분석 리포트 톤 금지. 중립적 서술 금지.
+- "너"한테 직접 말하듯이 써라. 말하듯이 끊어라.
+- 한 문장 = 한 방. 직설. 날카롭게. 판단·긴장·모순 있어도 됨.
 
-문장 규칙(강제):
-- 각 배열 항목은 한 문장만 쓴다.
-- 문장은 마침표로 끝낸다.
-- 아래 표현 금지: "합니다", "있습니다", "중요합니다", "추구합니다", "할 수", "바랍니다", "응원", "괜찮", "힘든", "도움", "하세요".
+문장 스타일(강제):
+- 주어 넣어라: "너", "지금 상태", "이 흐름".
+- 좋은 예: "너 지금 변화 욕구 터진 상태다." "너 감정 표현 안 한다. 그래서 관계 오래 못 간다." "너 구속 들어오면 바로 답답해한다."
+- 금지: "~하는 시기다", "~경향이 있다", "~문제가 발생한다", "~영향을 준다", "~추구하는 성향이다", "~부족하다" (단독). "합니다/있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 전부 금지.
 `.trim();
 
 async function callGemini<T>(payload: {
@@ -358,6 +354,7 @@ function hasForbiddenTone(text: unknown) {
     "바람직합니다",
     "보입니다",
     "경향이 있습니다",
+    "경향이 있다",
     "하세요",
     "하실",
     "괜찮",
@@ -368,6 +365,12 @@ function hasForbiddenTone(text: unknown) {
     "할 수",
     "중요합니다",
     "추구합니다",
+    "시기다",
+    "시기이다",
+    "문제가 발생",
+    "문제를 일으킨다",
+    "영향을 준다",
+    "영향을 미친다",
   ];
   return forbidden.some((w) => t.includes(w));
 }
@@ -389,6 +392,43 @@ function countForbiddenInObject(obj: any) {
   };
   visit(obj);
   return count;
+}
+
+/** Post-process: rewrite stiff/report phrases to direct speech. No Gemini call. */
+function rewriteStiffPhrases(s: string): string {
+  if (typeof s !== "string" || !s.trim()) return s;
+  let t = s.trim();
+  t = t.replace(/(.+)(하는 시기다)/g, "지금 $1한다");
+  t = t.replace(/(.+)(하는 시기이다)/g, "지금 $1한다");
+  t = t.replace(/시기다\.?$/g, "다.");
+  t = t.replace(/시기이다\.?$/g, "다.");
+  t = t.replace(/문제가 발생한다/g, "문제 터진다");
+  t = t.replace(/문제를 일으킨다/g, "문제 터진다");
+  t = t.replace(/영향을 준다/g, "영향 바로 간다");
+  t = t.replace(/영향을 미친다/g, "영향 바로 간다");
+  t = t.replace(/(.+)(경향이 있다)/g, "$1한다");
+  t = t.replace(/(.+)(경향이 있다\.?)/g, "$1한다.");
+  t = t.replace(/경향이 있다\.?/g, "한다.");
+  t = t.replace(/경향이 강하다\.?/g, "강하다.");
+  return t;
+}
+
+function applyToneToParsed<T extends Record<string, unknown>>(parsed: T): T {
+  const out = { ...parsed } as T;
+  const rewrite = (v: unknown): unknown => {
+    if (typeof v === "string") return rewriteStiffPhrases(v);
+    if (Array.isArray(v)) return v.map(rewrite);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const o = {} as Record<string, unknown>;
+      for (const [k, val] of Object.entries(v)) o[k] = rewrite(val);
+      return o;
+    }
+    return v;
+  };
+  for (const key of Object.keys(out)) {
+    (out as Record<string, unknown>)[key] = rewrite((out as Record<string, unknown>)[key]);
+  }
+  return out;
 }
 
 type StrictGeminiResult = {
@@ -561,7 +601,7 @@ ${categoryPrompt}
 4. 아래 JSON 스키마를 반드시 지켜라.
 5. 모든 섹션을 비우지 마라. 전부 채워라.
 6. 내용이 비어 있으면 안 된다.
-7. 직설적이고 간결하게 써라.
+7. 문장 스타일: "너"한테 말하듯이. 한 문장에 주어(너/지금 상태/이 흐름) 넣어라. "~하는 시기다" "~경향이 있다" "~문제가 발생한다" 금지. "지금 ~다" "너 ~한다" "~ 때문에 꼬인다" 써라.
 
 반환 JSON 스키마(이 구조만 반환):
 {
@@ -634,10 +674,17 @@ ${categoryPrompt}
     );
   }
 
-  const parsed = normalizeCategoryReading(aiResult);
+  let parsed = normalizeCategoryReading(aiResult);
+  parsed = applyToneToParsed(parsed);
 
   const mapped: UnifiedSajuResult = {
     ...fixed,
+    original: {
+      pillar: fixed.pillar,
+      elements: fixed.elements,
+      sinsal: fixed.sinsal,
+      badges: fixed.badges,
+    },
     summary: {
       ...fixed.summary,
       one_liner: parsed.one_liner,
@@ -725,8 +772,8 @@ ${JSON.stringify(reading ?? {}, null, 2)}
 [사용자 질문]
 ${userInput}
 
-반드시 한국어로만 답해라.
-JSON만 반환해라.
+반드시 한국어로만 답해라. JSON만 반환해라.
+문장 스타일: "너"한테 말하듯이. 한 문장에 주어 넣어라. "~하는 시기다" "~경향이 있다" "~문제가 발생한다" 금지. "지금 ~다" "너 ~한다" 써라.
 
 반환 JSON 스키마(이 구조만 반환):
 {
@@ -784,7 +831,8 @@ JSON만 반환해라.
     });
   }
 
-  const parsed = normalizeCategoryReading(aiResult);
+  let parsed = normalizeCategoryReading(aiResult);
+  parsed = applyToneToParsed(parsed);
 
   const finalToneForbiddenCount = countForbiddenInObject(aiResult);
   const finalSchemaCheck = validateStrictSchema(aiResult);
@@ -801,6 +849,12 @@ JSON만 반환해라.
 
   const mapped: UnifiedSajuResult = {
     ...fixed,
+    original: {
+      pillar: fixed.pillar,
+      elements: fixed.elements,
+      sinsal: fixed.sinsal,
+      badges: fixed.badges,
+    },
     summary: {
       ...fixed.summary,
       one_liner: parsed.one_liner,
