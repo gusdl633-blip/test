@@ -7,10 +7,10 @@ import SajuSummaryHeader from "./components/SajuSummaryHeader";
 import {
   SajuProfile,
   UnifiedSajuResult,
-  CATEGORIES,
   generateSajuReading,
   generateUnifiedSaju,
 } from "./services/geminiService";
+import { FORTUNE_CATEGORIES } from "./constants/fortuneCategories";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from "lucide-react";
 import ErrorModal from "./components/ErrorModal";
@@ -41,7 +41,8 @@ export default function App() {
     setIsFetchingSummary(true);
     try {
       setErrorMessage(null);
-      const fixed = await generateUnifiedSaju(data, sessionId);
+      const requestId = Math.random().toString(36).substring(7);
+      const fixed = await generateUnifiedSaju(data, sessionId, requestId);
       setProfile(data);
       setSummary(fixed);
     } catch (error: any) {
@@ -198,7 +199,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, [profile]);
 
-  const activeCategory = CATEGORIES.find((c) => c.id === currentCategory);
+  const activeCategory = FORTUNE_CATEGORIES.find((c) => c.id === currentCategory);
 
   const pathname = typeof window !== "undefined" ? window.location.pathname || "/" : "/";
   const shouldShowSetup =
@@ -342,17 +343,19 @@ export default function App() {
               </div>
 
               <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-5">
-               {CATEGORIES.map((category, index) => (
-  <CategoryCard
-    key={category.id}
-    index={index + 1}
-    titleKr={category.titleKr}
-    titleEn={category.titleEn}
-    subtitle={category.subtitle}
-    icon={category.icon}
-    onClick={() => handleCategorySelect(category.id)}
-  />
-))}
+                {FORTUNE_CATEGORIES.slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((category) => (
+                    <CategoryCard
+                      key={category.id}
+                      index={category.order}
+                      titleKr={category.label}
+                      titleEn={category.titleEn}
+                      subtitle={category.subtitle}
+                      icon={category.icon}
+                      onClick={() => handleCategorySelect(category.id)}
+                    />
+                  ))}
               </div>
             </motion.section>
           )}
@@ -381,8 +384,8 @@ export default function App() {
                 {activeCategory && (
                   <div className="text-right">
                     <div className="text-white/40 text-xs uppercase tracking-[0.2em]">Category</div>
-                   <div className="text-white font-semibold">{activeCategory.titleKr}</div>
-<div className="text-white/35 text-xs mt-1">{activeCategory.titleEn}</div>
+                    <div className="text-white font-semibold">{activeCategory.label}</div>
+                    <div className="text-white/35 text-xs mt-1">{activeCategory.titleEn}</div>
                   </div>
                 )}
               </div>
@@ -391,7 +394,11 @@ export default function App() {
                 profile={profile}
                 summary={summary}
                 reading={reading}
-                category={activeCategory}
+                category={
+                  activeCategory
+                    ? { titleKr: activeCategory.label, titleEn: activeCategory.titleEn }
+                    : null
+                }
                 isLoading={isLoading}
                 onAskDeeper={(prompt) => {
                   setInitialChatInput(prompt);

@@ -2,6 +2,7 @@ import type { SajuProfile, UnifiedSajuResult } from "../types";
 export type { SajuProfile, UnifiedSajuResult };
 
 import { calculateSajuFromProfile, type CalculatedSaju } from "../lib/sajuCalculator";
+import { FORTUNE_CATEGORIES, type FortuneCategoryId } from "../constants/fortuneCategories";
 
 type ChatHistoryItem = { role: string; message: string };
 
@@ -246,64 +247,77 @@ function mergeFixedSaju(
   };
 }
 
-export const CATEGORIES = [
-  {
-    id: "overall",
-    titleKr: "종합운",
-    titleEn: "Sparkles",
-    subtitle: "전체 흐름 분석",
-    icon: "sparkles",
-  },
-  {
-    id: "money",
-    titleKr: "재물운",
-    titleEn: "Coins",
-    subtitle: "돈과 소비 흐름",
-    icon: "coins",
-  },
-  {
-    id: "love",
-    titleKr: "애정운",
-    titleEn: "Heart",
-    subtitle: "연애와 관계 흐름",
-    icon: "heart",
-  },
-  {
-    id: "career",
-    titleKr: "직업운",
-    titleEn: "Briefcase",
-    subtitle: "일과 커리어 흐름",
-    icon: "briefcase",
-  },
-  {
-    id: "health",
-    titleKr: "건강운",
-    titleEn: "Activity",
-    subtitle: "체력과 컨디션 흐름",
-    icon: "activity",
-  },
-] as const;
+/** Back-compat export used by older UI code (same order + ids). */
+export const CATEGORIES = FORTUNE_CATEGORIES.map((c) => ({
+  id: c.id,
+  titleKr: c.label,
+  titleEn: c.titleEn,
+  subtitle: c.subtitle,
+  icon: c.icon,
+}));
 
-const CATEGORY_LABELS: Record<string, string> = {
-  overall: "종합운",
-  money: "재물운",
-  love: "애정운",
-  career: "직업운",
-  health: "건강운",
-};
+function buildCategoryPrompt(
+  categoryId: FortuneCategoryId | string,
+  fixed: UnifiedSajuResult
+): { label: string; prompt: string } {
+  const label =
+    FORTUNE_CATEGORIES.find((c) => c.id === categoryId)?.label ??
+    (typeof categoryId === "string" ? categoryId : "카테고리");
 
-const CATEGORY_PROMPTS: Record<string, string> = {
-  overall:
-    "이 사람의 전체 운 흐름을 분석해라. 현재 분위기, 가장 강한 장점, 반복되는 약점, 지금 특히 조심할 점을 중심으로 정리해라.",
-  money:
-    "이 사람의 재물운을 분석해라. 돈을 버는 방식, 새는 지점, 소비 패턴, 모아지는 구조인지 흩어지는 구조인지, 당장 조심할 금전 리스크를 정리해라.",
-  love:
-    "이 사람의 애정운을 분석해라. 연애 성향, 관계 패턴, 감정 기복, 끌리는 상대 유형, 관계에서 반복되는 실수와 지금 시점의 애정 흐름을 정리해라.",
-  career:
-    "이 사람의 직업운을 분석해라. 일복, 커리어 방향, 잘 맞는 직무 스타일, 조직형/개인형 성향, 직장에서 반복되는 문제, 지금 시점의 커리어 흐름과 조심할 점을 정리해라.",
-  health:
-    "이 사람의 건강운을 분석해라. 체력 기복, 에너지 소모 패턴, 무리하기 쉬운 포인트, 생활 습관상 취약점, 지금 시점의 건강 관리 포인트를 정리해라.",
-};
+  switch (categoryId) {
+    case "year2026":
+      return {
+        label,
+        prompt:
+          "2026년 운세를 뽑아라. 2026 전체 흐름, 강해지는 영역, 깨지는 패턴, 밀어붙여도 되는 것, 절대 하지 말아야 할 것을 직설로 정리해라. 좋게 말하지 마라. 경고는 경고로 박아라.",
+      };
+    case "today": {
+      const zodiac = fixed.profile?.zodiac_korean ? `(${fixed.profile.zodiac_korean})` : "";
+      return {
+        label,
+        prompt:
+          `오늘의 운세를 뽑아라 ${zodiac}. 우선순위: 1) 별자리 2) 확정 사주 구조 3) 현재 요약. ` +
+          "오늘 감정 흐름, 오늘 피해야 할 행동, 오늘 밀어붙여도 되는 행동, 한줄 결론. 짧고 뾰족하게. 변명 금지.",
+      };
+    }
+    case "overall":
+      return {
+        label,
+        prompt:
+          "이 사람의 전체 운 흐름을 분석해라. 현재 분위기, 가장 강한 장점, 반복되는 약점, 지금 특히 조심할 점을 중심으로 정리해라.",
+      };
+    case "money":
+      return {
+        label,
+        prompt:
+          "이 사람의 재물운을 분석해라. 돈을 버는 방식, 새는 지점, 소비 패턴, 모아지는 구조인지 흩어지는 구조인지, 당장 조심할 금전 리스크를 정리해라.",
+      };
+    case "love":
+      return {
+        label,
+        prompt:
+          "이 사람의 애정운을 분석해라. 연애 성향, 관계 패턴, 감정 기복, 끌리는 상대 유형, 관계에서 반복되는 실수와 지금 시점의 애정 흐름을 정리해라.",
+      };
+    case "career":
+      return {
+        label,
+        prompt:
+          "이 사람의 직업운을 분석해라. 일복, 커리어 방향, 잘 맞는 직무 스타일, 조직형/개인형 성향, 직장에서 반복되는 문제, 지금 시점의 커리어 흐름과 조심할 점을 정리해라.",
+      };
+    case "health":
+      return {
+        label,
+        prompt:
+          "이 사람의 건강운을 분석해라. 체력 기복, 에너지 소모 패턴, 무리하기 쉬운 포인트, 생활 습관상 취약점, 지금 시점의 건강 관리 포인트를 정리해라.",
+      };
+    default:
+      return {
+        label,
+        prompt:
+          "이 사람의 운 흐름을 분석해라. 핵심 흐름, 반복 패턴, 조심할 점, 지금 당장 액션을 직설로 정리해라.",
+      };
+  }
+}
 
 export async function generateUnifiedSaju(
   profile: SajuProfile,
@@ -785,13 +799,7 @@ export async function generateSajuReading(
   requestId: string
 ): Promise<UnifiedSajuResult> {
   const fixed = await generateUnifiedSaju(profile, sessionId, requestId);
-
-  if (!CATEGORY_PROMPTS[categoryId]) {
-    throw new Error(`unknown categoryId: ${categoryId}`);
-  }
-
-  const categoryLabel = CATEGORY_LABELS[categoryId];
-  const categoryPrompt = CATEGORY_PROMPTS[categoryId];
+  const { label: categoryLabel, prompt: categoryPrompt } = buildCategoryPrompt(categoryId, fixed);
 
   console.log("CATEGORY ID:", categoryId);
   console.log("CATEGORY LABEL:", categoryLabel);

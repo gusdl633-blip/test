@@ -1,5 +1,5 @@
 import React from "react";
-import { Sparkles, Coins, Heart, Briefcase, Activity } from "lucide-react";
+import { Sparkles, Coins, Heart, Briefcase, Activity, Calendar, Sun } from "lucide-react";
 
 type CategoryCardProps = {
   index: number;
@@ -16,6 +16,8 @@ const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="w-5 h-5" />,
   briefcase: <Briefcase className="w-5 h-5" />,
   activity: <Activity className="w-5 h-5" />,
+  calendar: <Calendar className="w-5 h-5" />,
+  sun: <Sun className="w-5 h-5" />,
 };
 
 export default function CategoryCard({
