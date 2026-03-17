@@ -22,6 +22,15 @@ const SAJU_PERSONA_SYSTEM = `
 - 금지: "~하는 시기다", "~경향이 있다", "~문제가 발생한다", "~영향을 준다", "~추구하는 성향이다", "~부족하다" (단독). "합니다/있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 전부 금지.
 `.trim();
 
+/** Chat-only: minimum length and multi-sentence. Append to SAJU_PERSONA_SYSTEM for chat. */
+const SAJU_CHAT_LENGTH_RULES = `
+상담 응답 전용 규칙:
+- 각 응답은 최소 100자 이상으로 작성한다.
+- 짧게 끊지 말고 2~4문장으로 이어서 설명한다.
+- 단, 불필요한 감성 표현 없이 직설적으로 말한다.
+- 1문장: 핵심 판단. 2문장: 이유. 3문장: 결과/경고. 이 흐름 권장.
+`.trim();
+
 async function callGemini<T>(payload: {
   prompt: string;
   systemInstruction: string;
