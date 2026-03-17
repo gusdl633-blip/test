@@ -281,13 +281,15 @@ export default function App() {
                 </div>
 
                 <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-4 leading-tight">
-                  너를 구성하는 패턴을
+                  우리는 내가 선택을 한다고 믿지만
                   <br />
-                  <span className="text-neon-primary">정확하게 읽어낸다</span>
+                  <span className="text-neon-primary">결국 정해진 길로 돌아온다</span>
                 </h2>
 
                 <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-                  사주, MBTI, 별자리, 에니어그램을 한 구조로 묶어 네 사고, 감정, 관계 패턴을 해석한다.
+                  이건 해석이 아니라
+                  <br />
+                  네가 반복해온 방향이다
                 </p>
               </div>
 
