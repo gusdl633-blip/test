@@ -149,11 +149,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    const pathname = window.location.pathname || "/";
+    const hash = window.location.hash;
+
     const saved = localStorage.getItem("saju_profile");
 
     if (!saved) {
       setView("onboarding");
-      if (window.location.hash !== "#setup") {
+      if (hash !== "#setup") {
         window.location.hash = "#setup";
       }
       return;
@@ -162,7 +165,11 @@ export default function App() {
     try {
       const parsedProfile = JSON.parse(saved) as SajuProfile;
       setProfile(parsedProfile);
-      setView(window.location.hash === "#setup" ? "onboarding" : "dashboard");
+      if (pathname === "/setup" || hash === "#setup") {
+        setView("onboarding");
+        return;
+      }
+      setView("dashboard");
       fetchSummary(parsedProfile);
     } catch (e) {
       console.error("failed to parse saved profile", e);
@@ -192,6 +199,20 @@ export default function App() {
   }, [profile]);
 
   const activeCategory = CATEGORIES.find((c) => c.id === currentCategory);
+
+  const pathname = typeof window !== "undefined" ? window.location.pathname || "/" : "/";
+  const shouldShowSetup =
+    !profile || view === "onboarding" || pathname === "/setup";
+
+  console.log("[APP INIT STATE]", {
+    hasProfile: !!profile,
+    hasSummary: !!summary,
+    hasReading: !!reading,
+    selectedCategory: currentCategory,
+    currentPath: pathname,
+    view,
+    shouldShowSetup,
+  });
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -244,7 +265,7 @@ export default function App() {
 
       <main className="flex-1">
         <AnimatePresence mode="wait">
-          {view === "onboarding" && (
+          {shouldShowSetup && (
             <motion.section
               key="onboarding"
               initial={{ opacity: 0, y: 20 }}
@@ -274,7 +295,31 @@ export default function App() {
             </motion.section>
           )}
 
-          {view === "dashboard" && profile && summary && (
+          {!shouldShowSetup && view === "dashboard" && profile && !summary && (
+            <motion.section
+              key="dashboard-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto px-4 py-16 text-center"
+            >
+              {isFetchingSummary ? (
+                <>
+                  <div className="text-white/80 font-medium">사주 요약 불러오는 중...</div>
+                  <div className="mt-2 text-sm text-text-sub">잠시만 기다려.</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-white/80 font-medium">요약을 불러오지 못했다.</div>
+                  <div className="mt-2 text-sm text-text-sub">
+                    <a href="#setup" className="text-neon-primary underline">설정으로 돌아가기</a>
+                  </div>
+                </>
+              )}
+            </motion.section>
+          )}
+
+          {!shouldShowSetup && view === "dashboard" && profile && summary && (
             <motion.section
               key="dashboard"
               initial={{ opacity: 0, y: 20 }}
