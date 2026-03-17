@@ -283,7 +283,7 @@ export default function App() {
               transition={{ duration: 0.35 }}
               className="max-w-7xl mx-auto px-4 py-8"
             >
-              <SajuSummaryHeader summary={summary} profile={profile} />
+              <SajuSummaryHeader data={summary} />
 
               <div className="mt-12 mb-10 text-center">
                 <h2 className="text-5xl font-black tracking-tight text-white">
