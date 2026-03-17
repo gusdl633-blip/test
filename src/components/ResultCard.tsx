@@ -255,7 +255,7 @@ export default function ResultCard({
             </h3>
 
             <div className="px-3 py-1 bg-neon-primary/10 border border-neon-primary/30 rounded-lg text-[10px] font-bold text-neon-primary uppercase tracking-wider">
-              {extendedIdentity?.human_type || '분석 중'}
+              {extendedIdentity?.human_type?.trim() || '데이터 없음'}
             </div>
           </div>
 
@@ -274,8 +274,8 @@ export default function ResultCard({
                 </motion.div>
               ))
             ) : (
-              <div className="p-6 bg-white/5 border border-white/5 rounded-2xl text-text-sub">
-                핵심 분석 데이터를 불러오는 중이다.
+              <div className="p-6 bg-white/5 border border-white/5 rounded-2xl text-text-sub text-sm">
+                데이터 없음
               </div>
             )}
           </div>
@@ -294,7 +294,7 @@ export default function ResultCard({
                 Core Engine (사주)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.core_engine || '분석 중'}
+                {extendedIdentity?.core_engine?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -303,7 +303,7 @@ export default function ResultCard({
                 Thinking Algorithm (MBTI)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.thinking_style || '분석 중'}
+                {extendedIdentity?.thinking_style?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -312,7 +312,7 @@ export default function ResultCard({
                 Instinct Temperament (별자리)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.instinct_style || '분석 중'}
+                {extendedIdentity?.instinct_style?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -321,7 +321,7 @@ export default function ResultCard({
                 Motivation Core (애니어그램)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.motivation_core || '분석 중'}
+                {extendedIdentity?.motivation_core?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -330,7 +330,7 @@ export default function ResultCard({
                 Weakness Pattern (구조적 결함)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.weakness_pattern || '분석 중'}
+                {extendedIdentity?.weakness_pattern?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -339,7 +339,7 @@ export default function ResultCard({
                 Relationship Pattern (관계 방식)
               </div>
               <div className="text-sm text-text-main font-medium">
-                {extendedIdentity?.relationship_pattern || '분석 중'}
+                {extendedIdentity?.relationship_pattern?.trim() || '데이터 없음'}
               </div>
             </div>
 
@@ -368,7 +368,7 @@ export default function ResultCard({
           <div className="bg-gradient-to-br from-neon-secondary/10 to-neon-primary/10 border border-white/10 rounded-3xl p-8 space-y-8">
             <div className="text-center space-y-2">
               <div className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                {humanTypeCard?.title || '인간 유형 분석 중'}
+                {humanTypeCard?.title?.trim() || '데이터 없음'}
               </div>
 
               <p className="text-sm text-text-sub/70 italic">
@@ -391,7 +391,7 @@ export default function ResultCard({
                       </li>
                     ))
                   ) : (
-                    <li className="text-sm text-text-sub">강점 분석 중</li>
+                    <li className="text-sm text-text-sub">데이터 없음</li>
                   )}
                 </ul>
               </div>
@@ -410,7 +410,7 @@ export default function ResultCard({
                       </li>
                     ))
                   ) : (
-                    <li className="text-sm text-text-sub">약점 분석 중</li>
+                    <li className="text-sm text-text-sub">데이터 없음</li>
                   )}
                 </ul>
               </div>
@@ -434,7 +434,7 @@ export default function ResultCard({
                 </div>
               ))
             ) : (
-              <div className="text-sm text-text-sub">핵심 근거를 정리 중이다.</div>
+              <div className="text-sm text-text-sub">데이터 없음</div>
             )}
           </div>
         </section>
@@ -455,7 +455,7 @@ export default function ResultCard({
                   </li>
                 ))
               ) : (
-                <li className="text-text-sub">좋은 흐름 분석 중</li>
+                <li className="text-text-sub">데이터 없음</li>
               )}
             </ul>
           </section>
@@ -474,7 +474,7 @@ export default function ResultCard({
                   </li>
                 ))
               ) : (
-                <li className="text-text-sub">위험 신호 분석 중</li>
+                <li className="text-text-sub">데이터 없음</li>
               )}
             </ul>
           </section>
@@ -494,7 +494,7 @@ export default function ResultCard({
                   </li>
                 ))
               ) : (
-                <li className="text-sm text-text-sub">실행 항목 분석 중</li>
+                <li className="text-sm text-text-sub">데이터 없음</li>
               )}
             </ul>
           </section>
@@ -511,7 +511,7 @@ export default function ResultCard({
                   </li>
                 ))
               ) : (
-                <li className="text-sm text-text-sub">주의 행동 분석 중</li>
+                <li className="text-sm text-text-sub">데이터 없음</li>
               )}
             </ul>
           </section>

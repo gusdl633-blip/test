@@ -55,6 +55,29 @@ async function callGemini<T>(payload: {
   return JSON.parse(cleaned) as T;
 }
 
+/** Returns raw response text from Gemini (no parse). Use for safe parse pipeline. */
+async function getGeminiRawText(payload: {
+  prompt: string;
+  systemInstruction: string;
+  history?: { role: "user" | "model"; text: string }[];
+}): Promise<string> {
+  const res = await fetch("/api/gemini", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: payload.prompt,
+      systemInstruction: payload.systemInstruction,
+      history: payload.history ?? [],
+    }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error?.detail || error?.error || "Gemini API request failed");
+  }
+  const data = await res.json();
+  return typeof data?.text === "string" ? data.text : "{}";
+}
+
 function createEmptyUnifiedResult(
   profile: SajuProfile,
   fixed: CalculatedSaju,
@@ -108,6 +131,43 @@ function createEmptyUnifiedResult(
       share_summary: "",
     },
     chat_seed_questions: [],
+  };
+}
+
+/** Safe fallback when Gemini parse fails or content is unusable. Preserves original saju and base metadata. */
+function createSafeCategoryFallback(fixed: UnifiedSajuResult): UnifiedSajuResult {
+  return {
+    ...fixed,
+    original: fixed.original ?? {
+      pillar: fixed.pillar,
+      elements: fixed.elements,
+      sinsal: fixed.sinsal,
+      badges: fixed.badges,
+    },
+    summary: { ...fixed.summary, one_liner: fixed.summary?.one_liner ?? "" },
+    analysis: {
+      core_analysis: [],
+      logic_basis: [],
+      good_flow: [],
+      risk_flow: [],
+      action_now: [],
+      avoid_action: [],
+    },
+    extended_identity: {
+      ...fixed.extended_identity,
+      core_engine: "",
+      thinking_style: "",
+      instinct_style: "",
+      motivation_core: "",
+      weakness_pattern: "",
+      relationship_pattern: "",
+    },
+    human_type_card: {
+      title: "",
+      strengths: [],
+      weaknesses: [],
+      share_summary: "",
+    },
   };
 }
 
@@ -284,47 +344,99 @@ ${JSON.stringify(fixed, null, 2)}
   }
 }
 
-function normalizeCategoryReading(aiResult: any) {
-  // Strict schema:
-  // {
-  //   analysis: [string, string, string],
-  //   structure: { coreEngine, thinkingAlgorithm, instinctTemperament, motivationCore, weaknessPattern, relationshipPattern },
-  //   humanType: { title, strengths[3], weaknesses[3], shareSummary },
-  //   evidence[3], goodFlow[3], riskSignals[3], actions[3], avoidActions[3]
-  // }
+const MIN_ARRAY_LEN = 3;
+const MAX_ARRAY_PAD = 3;
 
-  const analysis = Array.isArray(aiResult?.analysis) ? aiResult.analysis.slice(0, 3) : [];
-  const evidence = Array.isArray(aiResult?.evidence) ? aiResult.evidence.slice(0, 3) : [];
-  const goodFlow = Array.isArray(aiResult?.goodFlow) ? aiResult.goodFlow.slice(0, 3) : [];
-  const riskSignals = Array.isArray(aiResult?.riskSignals) ? aiResult.riskSignals.slice(0, 3) : [];
-  const actions = Array.isArray(aiResult?.actions) ? aiResult.actions.slice(0, 3) : [];
-  const avoidActions = Array.isArray(aiResult?.avoidActions) ? aiResult.avoidActions.slice(0, 3) : [];
+function asString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  return String(value);
+}
+
+function asStringArray(value: unknown, maxPad: number = MAX_ARRAY_PAD): string[] {
+  if (!Array.isArray(value)) return [];
+  const list = value
+    .slice(0, maxPad)
+    .map((v) => (typeof v === "string" ? v : v != null ? String(v) : ""));
+  while (list.length < maxPad) list.push("");
+  return list;
+}
+
+/** Trim, remove repeated punctuation and markdown remnants; optionally apply light tone cleanup. */
+function cleanSentence(value: unknown): string {
+  let s = asString(value).trim();
+  if (!s) return "";
+  s = s.replace(/\s+/g, " ").replace(/([.,!?])\1+/g, "$1");
+  s = s.replace(/^```\w*\s*|\s*```$/g, "").trim();
+  return rewriteStiffPhrases(s);
+}
+
+function cleanSentenceArray(value: unknown, maxPad: number = MAX_ARRAY_PAD): string[] {
+  const arr = asStringArray(value, maxPad);
+  return arr.map((v) => cleanSentence(v));
+}
+
+function ensureStringArray(arr: unknown, minLen: number = MIN_ARRAY_LEN): string[] {
+  const list = Array.isArray(arr)
+    ? arr.slice(0, minLen).map((v) => (typeof v === "string" ? v.trim() : v != null ? String(v).trim() : ""))
+    : [];
+  while (list.length < minLen) list.push("");
+  return list;
+}
+
+/** Flexible raw schema from Gemini (all optional). */
+type RawCategorySchema = {
+  analysis?: string[];
+  structure?: {
+    coreEngine?: string;
+    thinkingAlgorithm?: string;
+    instinctTemperament?: string;
+    motivationCore?: string;
+    weaknessPattern?: string;
+    relationshipPattern?: string;
+  };
+  humanType?: {
+    title?: string;
+    strengths?: string[];
+    weaknesses?: string[];
+    shareSummary?: string;
+  };
+  evidence?: string[];
+  goodFlow?: string[];
+  riskSignals?: string[];
+  actions?: string[];
+  avoidActions?: string[];
+};
+
+function normalizeCategoryReading(aiResult: any) {
+  const raw = aiResult && typeof aiResult === "object" ? aiResult : {};
+
+  const analysis = cleanSentenceArray(raw.analysis);
+  const evidence = cleanSentenceArray(raw.evidence);
+  const goodFlow = cleanSentenceArray(raw.goodFlow);
+  const riskSignals = cleanSentenceArray(raw.riskSignals);
+  const actions = cleanSentenceArray(raw.actions);
+  const avoidActions = cleanSentenceArray(raw.avoidActions);
 
   const structure = {
-    coreEngine: typeof aiResult?.structure?.coreEngine === "string" ? aiResult.structure.coreEngine : "",
-    thinkingAlgorithm:
-      typeof aiResult?.structure?.thinkingAlgorithm === "string" ? aiResult.structure.thinkingAlgorithm : "",
-    instinctTemperament:
-      typeof aiResult?.structure?.instinctTemperament === "string" ? aiResult.structure.instinctTemperament : "",
-    motivationCore:
-      typeof aiResult?.structure?.motivationCore === "string" ? aiResult.structure.motivationCore : "",
-    weaknessPattern:
-      typeof aiResult?.structure?.weaknessPattern === "string" ? aiResult.structure.weaknessPattern : "",
-    relationshipPattern:
-      typeof aiResult?.structure?.relationshipPattern === "string" ? aiResult.structure.relationshipPattern : "",
+    coreEngine: cleanSentence(raw.structure?.coreEngine),
+    thinkingAlgorithm: cleanSentence(raw.structure?.thinkingAlgorithm),
+    instinctTemperament: cleanSentence(raw.structure?.instinctTemperament),
+    motivationCore: cleanSentence(raw.structure?.motivationCore),
+    weaknessPattern: cleanSentence(raw.structure?.weaknessPattern),
+    relationshipPattern: cleanSentence(raw.structure?.relationshipPattern),
   };
 
   const humanType = {
-    title: typeof aiResult?.humanType?.title === "string" ? aiResult.humanType.title : "",
-    strengths: Array.isArray(aiResult?.humanType?.strengths) ? aiResult.humanType.strengths.slice(0, 3) : [],
-    weaknesses: Array.isArray(aiResult?.humanType?.weaknesses) ? aiResult.humanType.weaknesses.slice(0, 3) : [],
-    shareSummary:
-      typeof aiResult?.humanType?.shareSummary === "string" ? aiResult.humanType.shareSummary : "",
+    title: cleanSentence(raw.humanType?.title),
+    strengths: cleanSentenceArray(raw.humanType?.strengths),
+    weaknesses: cleanSentenceArray(raw.humanType?.weaknesses),
+    shareSummary: cleanSentence(raw.humanType?.shareSummary),
   };
 
   const one_liner =
-    (typeof analysis?.[0] === "string" && analysis[0]) ||
-    (typeof humanType.shareSummary === "string" && humanType.shareSummary) ||
+    (analysis[0] && analysis[0].trim()) ||
+    (humanType.shareSummary && humanType.shareSummary.trim()) ||
     "";
 
   return {
@@ -338,6 +450,107 @@ function normalizeCategoryReading(aiResult: any) {
     actions,
     avoidActions,
   };
+}
+
+/** Strip markdown wrappers and try parse; if fail, try extract first {...} and remove trailing commas. */
+function tryParseJson(rawText: string): { ok: true; data: RawCategorySchema } | { ok: false } {
+  let cleaned = rawText
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+  try {
+    const data = JSON.parse(cleaned) as RawCategorySchema;
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      return { ok: true, data };
+    }
+  } catch {
+    // try recover: first {...} block
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      let block = match[0];
+      block = block.replace(/,(\s*[}\]])/g, "$1");
+      try {
+        const data = JSON.parse(block) as RawCategorySchema;
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          return { ok: true, data };
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return { ok: false };
+}
+
+/**
+ * Central safe pipeline: parse raw Gemini text, normalize, map to UnifiedSajuResult.
+ * Never throws for parse/schema/tone. Returns fallback result when parse fails or content unusable.
+ */
+function safeParseAndNormalizeCategoryReading(
+  rawText: string,
+  fixed: UnifiedSajuResult
+): UnifiedSajuResult {
+  console.log("[SAJU][raw Gemini text]", rawText?.slice(0, 200) + (rawText?.length > 200 ? "…" : ""));
+
+  const parsed = tryParseJson(rawText);
+  if (!parsed.ok) {
+    console.warn("[SAJU][fallback] using safe fallback result (parse failed)");
+    return createSafeCategoryFallback(fixed);
+  }
+
+  const raw = parsed.data;
+  console.log("[SAJU][parsed raw object]", { keys: Object.keys(raw || {}) });
+
+  const schemaCheck = validateStrictSchema(raw);
+  if (!schemaCheck.ok) {
+    console.warn("[SAJU][schema] partial but recoverable", { issues: schemaCheck.issues.slice(0, 8) });
+  }
+
+  const toneCount = countForbiddenInObject(raw);
+  if (toneCount > 0) {
+    console.warn("[SAJU][tone] cleaned locally", { violationCount: toneCount });
+  }
+
+  const normalized = normalizeCategoryReading(raw);
+  const withTone = applyToneToParsed(normalized as unknown as Record<string, unknown>) as typeof normalized;
+
+  const mapped: UnifiedSajuResult = {
+    ...fixed,
+    original: {
+      pillar: fixed.pillar,
+      elements: fixed.elements,
+      sinsal: fixed.sinsal,
+      badges: fixed.badges,
+    },
+    summary: { ...fixed.summary, one_liner: withTone.one_liner },
+    analysis: {
+      ...fixed.analysis,
+      core_analysis: withTone.analysis,
+      logic_basis: withTone.evidence,
+      good_flow: withTone.goodFlow,
+      risk_flow: withTone.riskSignals,
+      action_now: withTone.actions,
+      avoid_action: withTone.avoidActions,
+    },
+    extended_identity: {
+      ...fixed.extended_identity,
+      core_engine: withTone.structure.coreEngine,
+      thinking_style: withTone.structure.thinkingAlgorithm,
+      instinct_style: withTone.structure.instinctTemperament,
+      motivation_core: withTone.structure.motivationCore,
+      weakness_pattern: withTone.structure.weaknessPattern,
+      relationship_pattern: withTone.structure.relationshipPattern,
+    },
+    human_type_card: {
+      ...fixed.human_type_card,
+      title: withTone.humanType.title,
+      strengths: withTone.humanType.strengths,
+      weaknesses: withTone.humanType.weaknesses,
+      share_summary: withTone.humanType.shareSummary,
+    },
+  };
+
+  return mapped;
 }
 
 function hasForbiddenTone(text: unknown) {
@@ -406,10 +619,15 @@ function rewriteStiffPhrases(s: string): string {
   t = t.replace(/문제를 일으킨다/g, "문제 터진다");
   t = t.replace(/영향을 준다/g, "영향 바로 간다");
   t = t.replace(/영향을 미친다/g, "영향 바로 간다");
-  t = t.replace(/(.+)(경향이 있다)/g, "$1한다");
-  t = t.replace(/(.+)(경향이 있다\.?)/g, "$1한다.");
-  t = t.replace(/경향이 있다\.?/g, "한다.");
+  t = t.replace(/(.+)(경향이 있다)/g, "$1쪽이다");
+  t = t.replace(/(.+)(경향이 있다\.?)/g, "$1쪽이다.");
+  t = t.replace(/경향이 있다\.?/g, "쪽이다.");
   t = t.replace(/경향이 강하다\.?/g, "강하다.");
+  t = t.replace(/할 수 있다\.?/g, "한다.");
+  t = t.replace(/할 수 있습니다/g, "한다.");
+  t = t.replace(/할 수 있\./g, "한다.");
+  t = t.replace(/해 줄 수 있다\.?/g, "해 준다.");
+  t = t.replace(/될 수 있다\.?/g, "된다.");
   return t;
 }
 
@@ -541,6 +759,16 @@ function validateStrictSchema(obj: any) {
   return { ok: issues.length === 0, issues };
 }
 
+/** True if we can safely normalize (object with expected shape). Only throw when this is false. */
+function isRecoverableSchema(obj: unknown): boolean {
+  return (
+    obj != null &&
+    typeof obj === "object" &&
+    !Array.isArray(obj) &&
+    Object.prototype.toString.call(obj) === "[object Object]"
+  );
+}
+
 export async function generateSajuReading(
   profile: SajuProfile,
   categoryId: string,
@@ -629,92 +857,20 @@ ${categoryPrompt}
 `.trim();
 
   console.log("[SAJU PROMPT STYLE]", { mode: "analysis", persona: "ENTP_SHAMAN" });
-  let aiResult = await callGemini<any>({
-    prompt,
-    systemInstruction: SAJU_PERSONA_SYSTEM,
-    history: [],
-  });
 
-  const toneForbiddenCount = countForbiddenInObject(aiResult);
-  const schemaCheck = validateStrictSchema(aiResult);
-
-  if (toneForbiddenCount > 0 || !schemaCheck.ok) {
-    console.warn("[SAJU][retry] violations detected, retrying once", {
-      toneForbiddenCount,
-      schemaOk: schemaCheck.ok,
-      schemaIssues: schemaCheck.issues.slice(0, 12),
-    });
-    aiResult = await callGemini<any>({
-      prompt: `${prompt}
-
-규칙 위반했다.
-- 같은 JSON 스키마 그대로 다시 반환.
-- 키 이름 바꾸지 마라.
-- 모든 배열은 3개로 채워라. 빈 문자열 금지.
-- structure/humanType 모든 필드 채워라. 빈 문자열 금지.
-- 존댓말/설명체/위로체 금지. "~합니다/~있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 금지.
-`.trim(),
+  let rawText: string;
+  try {
+    rawText = await getGeminiRawText({
+      prompt,
       systemInstruction: SAJU_PERSONA_SYSTEM,
       history: [],
     });
+  } catch (err) {
+    console.error("[SAJU][fatal] unrecoverable Gemini result", err);
+    throw err;
   }
 
-  console.log("AI RESULT:", aiResult);
-
-  const finalToneForbiddenCount = countForbiddenInObject(aiResult);
-  const finalSchemaCheck = validateStrictSchema(aiResult);
-  if (finalToneForbiddenCount > 0 || !finalSchemaCheck.ok) {
-    console.error("[SAJU][retry] still invalid after retry", {
-      finalToneForbiddenCount,
-      schemaOk: finalSchemaCheck.ok,
-      schemaIssues: finalSchemaCheck.issues.slice(0, 20),
-    });
-    throw new Error(
-      `Gemini result invalid (tone/schema). issues=${finalSchemaCheck.issues.slice(0, 10).join("; ")}`
-    );
-  }
-
-  let parsed = normalizeCategoryReading(aiResult);
-  parsed = applyToneToParsed(parsed);
-
-  const mapped: UnifiedSajuResult = {
-    ...fixed,
-    original: {
-      pillar: fixed.pillar,
-      elements: fixed.elements,
-      sinsal: fixed.sinsal,
-      badges: fixed.badges,
-    },
-    summary: {
-      ...fixed.summary,
-      one_liner: parsed.one_liner,
-    },
-    analysis: {
-      ...fixed.analysis,
-      core_analysis: parsed.analysis,
-      logic_basis: parsed.evidence,
-      good_flow: parsed.goodFlow,
-      risk_flow: parsed.riskSignals,
-      action_now: parsed.actions,
-      avoid_action: parsed.avoidActions,
-    },
-    extended_identity: {
-      ...fixed.extended_identity,
-      core_engine: parsed.structure.coreEngine,
-      thinking_style: parsed.structure.thinkingAlgorithm,
-      instinct_style: parsed.structure.instinctTemperament,
-      motivation_core: parsed.structure.motivationCore,
-      weakness_pattern: parsed.structure.weaknessPattern,
-      relationship_pattern: parsed.structure.relationshipPattern,
-    },
-    human_type_card: {
-      ...fixed.human_type_card,
-      title: parsed.humanType.title,
-      strengths: parsed.humanType.strengths,
-      weaknesses: parsed.humanType.weaknesses,
-      share_summary: parsed.humanType.shareSummary,
-    },
-  };
+  const mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
 
   console.log("[SAJU] mapped reading (generateSajuReading):", {
     hasSummary: !!mapped.summary?.one_liner,
@@ -801,90 +957,20 @@ ${userInput}
 `.trim();
 
   console.log("[SAJU PROMPT STYLE]", { mode: "chat", persona: "ENTP_SHAMAN" });
-  let aiResult = await callGemini<any>({
-    prompt,
-    systemInstruction: SAJU_PERSONA_SYSTEM,
-    history: [],
-  });
 
-  const toneForbiddenCount = countForbiddenInObject(aiResult);
-  const schemaCheck = validateStrictSchema(aiResult);
-
-  if (toneForbiddenCount > 0 || !schemaCheck.ok) {
-    console.warn("[SAJU][retry][chat] violations detected, retrying once", {
-      toneForbiddenCount,
-      schemaOk: schemaCheck.ok,
-      schemaIssues: schemaCheck.issues.slice(0, 12),
-    });
-    aiResult = await callGemini<any>({
-      prompt: `${prompt}
-
-규칙 위반했다.
-- 같은 JSON 스키마 그대로 다시 반환.
-- 키 이름 바꾸지 마라.
-- 모든 배열은 3개로 채워라. 빈 문자열 금지.
-- structure/humanType 모든 필드 채워라. 빈 문자열 금지.
-- 존댓말/설명체/위로체 금지. "~합니다/~있습니다/할 수 있습니다/중요합니다/추구합니다/필요합니다/바람직합니다/보입니다/경향이 있습니다" 금지.
-`.trim(),
+  let rawText: string;
+  try {
+    rawText = await getGeminiRawText({
+      prompt,
       systemInstruction: SAJU_PERSONA_SYSTEM,
       history: [],
     });
+  } catch (err) {
+    console.error("[SAJU][fatal] unrecoverable Gemini result (chat)", err);
+    throw err;
   }
 
-  let parsed = normalizeCategoryReading(aiResult);
-  parsed = applyToneToParsed(parsed);
-
-  const finalToneForbiddenCount = countForbiddenInObject(aiResult);
-  const finalSchemaCheck = validateStrictSchema(aiResult);
-  if (finalToneForbiddenCount > 0 || !finalSchemaCheck.ok) {
-    console.error("[SAJU][retry][chat] still invalid after retry", {
-      finalToneForbiddenCount,
-      schemaOk: finalSchemaCheck.ok,
-      schemaIssues: finalSchemaCheck.issues.slice(0, 20),
-    });
-    throw new Error(
-      `Gemini chat result invalid (tone/schema). issues=${finalSchemaCheck.issues.slice(0, 10).join("; ")}`
-    );
-  }
-
-  const mapped: UnifiedSajuResult = {
-    ...fixed,
-    original: {
-      pillar: fixed.pillar,
-      elements: fixed.elements,
-      sinsal: fixed.sinsal,
-      badges: fixed.badges,
-    },
-    summary: {
-      ...fixed.summary,
-      one_liner: parsed.one_liner,
-    },
-    analysis: {
-      ...fixed.analysis,
-      core_analysis: parsed.analysis,
-      logic_basis: parsed.evidence,
-      good_flow: parsed.goodFlow,
-      risk_flow: parsed.riskSignals,
-      action_now: parsed.actions,
-      avoid_action: parsed.avoidActions,
-    },
-    extended_identity: {
-      ...fixed.extended_identity,
-      core_engine: parsed.structure.coreEngine,
-      thinking_style: parsed.structure.thinkingAlgorithm,
-      instinct_style: parsed.structure.instinctTemperament,
-      motivation_core: parsed.structure.motivationCore,
-      weakness_pattern: parsed.structure.weaknessPattern,
-      relationship_pattern: parsed.structure.relationshipPattern,
-    },
-    human_type_card: {
-      ...fixed.human_type_card,
-      title: parsed.humanType.title,
-      strengths: parsed.humanType.strengths,
-      weaknesses: parsed.humanType.weaknesses,
-      share_summary: parsed.humanType.shareSummary,
-    },
-  };
+  const mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
 
   console.log("[SAJU][chat] mapped result:", {
     one_liner: mapped.summary?.one_liner,
