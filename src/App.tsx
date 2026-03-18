@@ -15,10 +15,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from "lucide-react";
 import ErrorModal from "./components/ErrorModal";
 
-type View = "onboarding" | "dashboard" | "result" | "chat";
+/** Explicit app screen state. Single source of truth for which screen is shown. */
+type AppScreen = "setup" | "home" | "result" | "consult";
 
 export default function App() {
-  const [view, setView] = useState<View>("onboarding");
+  const [screen, setScreen] = useState<AppScreen>("setup");
   const [profile, setProfile] = useState<SajuProfile | null>(null);
   const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
   const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
@@ -66,26 +67,28 @@ export default function App() {
 
     setProfile(data);
     localStorage.setItem("saju_profile", JSON.stringify(data));
-
     window.location.hash = "";
-    setView("dashboard");
 
+    setScreen("home");
+    console.log("[APP FLOW] setup -> home");
     await fetchSummary(data);
   };
 
   const handleCategorySelect = async (categoryId: string) => {
     if (!profile) return;
 
+    setCurrentCategory(categoryId);
+    setReading(null);
+    setScreen("result");
+    console.log("[APP FLOW] home -> result", categoryId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
     const run = async () => {
       const requestId = Math.random().toString(36).substring(7);
 
       try {
         setErrorMessage(null);
-        setCurrentCategory(categoryId);
-        setReading(null);
         setIsLoading(true);
-        setView("result");
-        window.scrollTo({ top: 0, behavior: "smooth" });
 
         const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
 
@@ -144,20 +147,46 @@ export default function App() {
     setIsLoading(false);
     setIsFetchingSummary(false);
     setSessionId(Math.random().toString(36).substring(7));
-    setView("onboarding");
-
+    setScreen("setup");
     window.location.hash = "#setup";
+  };
+
+  const goBackFromResult = () => {
+    setScreen("home");
+    setCurrentCategory(null);
+    setReading(null);
+  };
+
+  const openConsult = (prompt?: string) => {
+    setInitialChatInput(prompt ?? "");
+    setScreen("consult");
+    console.log("[APP FLOW] result -> consult");
+  };
+
+  const closeConsult = () => {
+    setInitialChatInput("");
+    setScreen(reading ? "result" : "home");
   };
 
   useEffect(() => {
     const pathname = window.location.pathname || "/";
     const hash = window.location.hash;
+    const isRoot = pathname === "/";
+    const isSetupPath = pathname === "/setup" || hash === "#setup";
+
+    if (isRoot || isSetupPath) {
+      setScreen("setup");
+      if (isRoot) {
+        console.log("[APP ENTRY] forcing setup page on root path");
+      }
+      if (hash !== "#setup" && isSetupPath) {
+        window.location.hash = "#setup";
+      }
+    }
 
     const saved = localStorage.getItem("saju_profile");
-
     if (!saved) {
-      setView("onboarding");
-      if (hash !== "#setup") {
+      if (!isRoot && hash !== "#setup") {
         window.location.hash = "#setup";
       }
       return;
@@ -166,11 +195,10 @@ export default function App() {
     try {
       const parsedProfile = JSON.parse(saved) as SajuProfile;
       setProfile(parsedProfile);
-      if (pathname === "/setup" || hash === "#setup") {
-        setView("onboarding");
+      if (isRoot || isSetupPath) {
         return;
       }
-      setView("dashboard");
+      setScreen("home");
       fetchSummary(parsedProfile);
     } catch (e) {
       console.error("failed to parse saved profile", e);
@@ -178,7 +206,7 @@ export default function App() {
       setProfile(null);
       setSummary(null);
       setReading(null);
-      setView("onboarding");
+      setScreen("setup");
       window.location.hash = "#setup";
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,33 +214,31 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
-
-      if (hash === "#setup") {
-        setView("onboarding");
-      } else if (profile) {
-        setView("dashboard");
+      if (window.location.hash === "#setup") {
+        setScreen("setup");
       }
     };
-
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [profile]);
+  }, []);
 
   const activeCategory = FORTUNE_CATEGORIES.find((c) => c.id === currentCategory);
 
   const pathname = typeof window !== "undefined" ? window.location.pathname || "/" : "/";
-  const shouldShowSetup =
-    !profile || view === "onboarding" || pathname === "/setup";
 
-  console.log("[APP INIT STATE]", {
+  useEffect(() => {
+    if (screen === "result" && !profile) setScreen("home");
+    if (screen === "consult" && !profile) setScreen("setup");
+    if (screen === "home" && !profile) setScreen("setup");
+  }, [screen, profile]);
+
+  console.log("[APP FLOW]", {
+    path: pathname,
+    screen,
     hasProfile: !!profile,
     hasSummary: !!summary,
     hasReading: !!reading,
     selectedCategory: currentCategory,
-    currentPath: pathname,
-    view,
-    shouldShowSetup,
   });
 
   return (
@@ -240,7 +266,7 @@ export default function App() {
             {profile && (
               <>
                 <button
-                  onClick={() => setView("chat")}
+                  onClick={() => { setScreen("consult"); console.log("[APP FLOW] home -> consult"); }}
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
                 >
                   <span className="inline-flex items-center gap-2">
@@ -266,9 +292,9 @@ export default function App() {
 
       <main className="flex-1">
         <AnimatePresence mode="wait">
-          {shouldShowSetup && (
+          {screen === "setup" && (
             <motion.section
-              key="onboarding"
+              key="setup"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -298,9 +324,9 @@ export default function App() {
             </motion.section>
           )}
 
-          {!shouldShowSetup && view === "dashboard" && profile && !summary && (
+          {screen === "home" && profile && !summary && (
             <motion.section
-              key="dashboard-loading"
+              key="home-loading"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -322,9 +348,9 @@ export default function App() {
             </motion.section>
           )}
 
-          {!shouldShowSetup && view === "dashboard" && profile && summary && (
+          {screen === "home" && profile && summary && (
             <motion.section
-              key="dashboard"
+              key="home"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -360,7 +386,7 @@ export default function App() {
             </motion.section>
           )}
 
-          {view === "result" && profile && (
+          {screen === "result" && profile && (
             <motion.section
               key="result"
               initial={{ opacity: 0, y: 20 }}
@@ -371,11 +397,7 @@ export default function App() {
             >
               <div className="mb-6 flex items-center justify-between">
                 <button
-                  onClick={() => {
-                    setView("dashboard");
-                    setCurrentCategory(null);
-                    setReading(null);
-                  }}
+                  onClick={goBackFromResult}
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
                 >
                   ← 돌아가기
@@ -401,17 +423,14 @@ export default function App() {
                 }
                 categoryId={currentCategory}
                 isLoading={isLoading}
-                onAskDeeper={(prompt) => {
-                  setInitialChatInput(prompt);
-                  setView("chat");
-                }}
+                onAskDeeper={openConsult}
               />
             </motion.section>
           )}
 
-          {view === "chat" && profile && (
+          {screen === "consult" && profile && (
             <motion.section
-              key="chat"
+              key="consult"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -420,7 +439,7 @@ export default function App() {
             >
               <div className="mb-6 flex items-center justify-between">
                 <button
-                  onClick={() => setView(summary ? "dashboard" : "onboarding")}
+                  onClick={closeConsult}
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:border-neon-primary/40 hover:text-neon-primary transition-colors"
                 >
                   ← 돌아가기
