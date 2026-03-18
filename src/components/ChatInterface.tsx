@@ -92,11 +92,11 @@ export default function ChatInterface({
     try {
       const requestId = Math.random().toString(36).substring(2, 10);
 
-      console.log("[SAJU][chat] context before chatWithSaju:", {
-        sessionId,
-        requestId,
+      console.log("[CHAT SEND]", {
+        hasProfile: !!profile,
         hasSummary: !!summary,
         hasReading: !!reading,
+        userInput: text,
         profile: {
           birthDate: profile.birthDate,
           birthTime: profile.birthTime,
@@ -106,6 +106,12 @@ export default function ChatInterface({
           zodiac_korean: profile.zodiac_korean,
           enneagram: profile.enneagram,
         },
+      });
+      console.log("[SAJU][chat] context before chatWithSaju:", {
+        sessionId,
+        requestId,
+        hasSummary: !!summary,
+        hasReading: !!reading,
       });
 
       const result = await chatWithSaju(
@@ -122,6 +128,12 @@ export default function ChatInterface({
         result?.analysis?.core_analysis?.[0] ||
         result?.analysis?.logic_basis?.[0] ||
         "지금 답변을 정리 중이다.";
+
+      console.log("[CHAT FINAL RESPONSE (UI)]", {
+        source: result?.summary?.one_liner ? "one_liner" : result?.analysis?.core_analysis?.[0] ? "core_analysis[0]" : "logic_basis[0] or fallback",
+        length: assistantText?.length ?? 0,
+        preview: (assistantText ?? "").slice(0, 80) + ((assistantText?.length ?? 0) > 80 ? "…" : ""),
+      });
 
       setMessages((prev) => [
         ...prev,

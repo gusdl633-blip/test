@@ -32,6 +32,16 @@ const SAJU_CHAT_LENGTH_RULES = `
 - 1문장: 핵심 판단. 2문장: 이유. 3문장: 결과/경고. 이 흐름 권장.
 `.trim();
 
+const CHAT_MIN_LENGTH = 100;
+const CHAT_EXTENSION = " 결국 이 패턴을 못 바꾸면 같은 결과로 반복된다.";
+
+function ensureMinLength(text: string, minLen: number = CHAT_MIN_LENGTH): string {
+  if (!text || typeof text !== "string") return text;
+  const t = text.trim();
+  if (t.length >= minLen) return t;
+  return t + CHAT_EXTENSION;
+}
+
 async function callGemini<T>(payload: {
   prompt: string;
   systemInstruction: string;
@@ -989,6 +999,7 @@ ${JSON.stringify(reading ?? {}, null, 2)}
 ${userInput}
 
 반드시 한국어로만 답해라. JSON만 반환해라.
+상담 응답은 최소 100자 이상으로 써라. 2~4문장 이어서. 한 문장만 금지.
 문장 스타일: "너", "너는", "너가" 금지. 주어 생략한 직설체. "~하는 시기다" "~경향이 있다" 금지. "지금 ~다" 써라.
 
 반환 JSON 스키마(이 구조만 반환):
@@ -1022,7 +1033,7 @@ ${userInput}
   try {
     rawText = await getGeminiRawText({
       prompt,
-      systemInstruction: SAJU_PERSONA_SYSTEM,
+      systemInstruction: `${SAJU_PERSONA_SYSTEM}\n\n${SAJU_CHAT_LENGTH_RULES}`,
       history: [],
     });
   } catch (err) {
@@ -1030,7 +1041,22 @@ ${userInput}
     throw err;
   }
 
+  console.log("[CHAT RAW RESPONSE]", rawText?.slice(0, 300) + (rawText?.length > 300 ? "…" : ""));
+
   const mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
+
+  const rawDisplayText =
+    (mapped.summary?.one_liner ?? "").trim() ||
+    (mapped.analysis?.core_analysis?.filter(Boolean)[0] ?? "") ||
+    (mapped.analysis?.logic_basis?.filter(Boolean)[0] ?? "") ||
+    "";
+  const processedResponse = ensureMinLength(rawDisplayText);
+  mapped.summary = { ...mapped.summary, one_liner: processedResponse };
+
+  console.log("[CHAT FINAL RESPONSE]", {
+    length: processedResponse.length,
+    preview: processedResponse.slice(0, 120) + (processedResponse.length > 120 ? "…" : ""),
+  });
 
   console.log("[SAJU][chat] mapped result:", {
     one_liner: mapped.summary?.one_liner,

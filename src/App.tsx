@@ -456,8 +456,7 @@ export default function App() {
                 summary={summary}
                 reading={reading}
                 sessionId={sessionId}
-                initialInput={initialChatInput}
-                onInitialInputConsumed={() => setInitialChatInput("")}
+                initialMessage={initialChatInput}
               />
             </motion.section>
           )}
