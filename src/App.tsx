@@ -399,6 +399,7 @@ export default function App() {
                     ? { titleKr: activeCategory.label, titleEn: activeCategory.titleEn }
                     : null
                 }
+                categoryId={currentCategory}
                 isLoading={isLoading}
                 onAskDeeper={(prompt) => {
                   setInitialChatInput(prompt);

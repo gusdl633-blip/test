@@ -36,9 +36,10 @@ export default function ResultCard({
   onAskDeeper,
 }: Props) {
   const didLogRef = useRef(false);
-  const isToday = categoryId === "today";
+  const categoryLabel = category?.titleKr || category?.titleEn || "";
+  const isToday = categoryId === "today" || categoryLabel === "오늘의 운세";
+  const isYear2026 = categoryId === "year2026" || categoryLabel === "2026년 운세";
 
-  const categoryLabel = category?.titleKr || category?.titleEn || '';
   const onConsult = onAskDeeper;
 
   useEffect(() => {
@@ -450,32 +451,14 @@ export default function ResultCard({
         </>
         )}
 
-        {/* Section 3: 좋은 흐름 / 위험 신호 */}
+        {!isToday && (
+        <>
+        {/* Section 3: 좋은 흐름 / 위험 신호 — single block each, no duplicate */}
         <div className="grid md:grid-cols-2 gap-6 pt-10 border-t border-white/5">
           <section className="bg-neon-primary/5 p-6 rounded-2xl border border-neon-primary/20">
             <h3 className="flex items-center text-sm font-bold text-neon-primary mb-4">
               <CheckCircle2 className="w-4 h-4 mr-2" /> 좋은 흐름
             </h3>
-
-            <ul className="space-y-3 text-sm text-text-main/90">
-              {goodFlow.length > 0 ? (
-                goodFlow.map((item, i) => (
-                  <li key={i} className="flex items-start">
-                    <span className="text-neon-primary mr-2">•</span>
-                    {item}
-                  </li>
-                ))
-              ) : (
-                <li className="text-text-sub">{FALLBACK.line}</li>
-              )}
-            </ul>
-          </section>
-
-          <section className="bg-accent/5 p-6 rounded-2xl border border-accent/20">
-            <h3 className="flex items-center text-sm font-bold text-accent mb-4">
-              <AlertTriangle className="w-4 h-4 mr-2" /> 위험 신호
-            </h3>
-
             <ul className="space-y-3 text-sm text-text-main/90">
               {(goodFlow.length > 0 ? goodFlow : [FALLBACK.line]).map((item, i) => (
                 <li key={i} className="flex items-start">
@@ -485,12 +468,10 @@ export default function ResultCard({
               ))}
             </ul>
           </section>
-
           <section className="bg-accent/5 p-6 rounded-2xl border border-accent/20">
             <h3 className="flex items-center text-sm font-bold text-accent mb-4">
               <AlertTriangle className="w-4 h-4 mr-2" /> 위험 신호
             </h3>
-
             <ul className="space-y-3 text-sm text-text-main/90">
               {(riskFlow.length > 0 ? riskFlow : [FALLBACK.line]).map((item, i) => (
                 <li key={i} className="flex items-start">
@@ -506,40 +487,32 @@ export default function ResultCard({
         <div className="grid md:grid-cols-2 gap-10 pt-10 border-t border-white/5">
           <section className="space-y-4">
             <h3 className="text-sm font-bold text-neon-primary/80 tracking-wider">지금 당장 액션</h3>
-
             <ul className="space-y-3">
-              {actionNow.length > 0 ? (
-                actionNow.map((item, i) => (
-                  <li key={i} className="flex items-start text-sm text-text-main/80">
-                    <ArrowRight className="w-4 h-4 mr-3 mt-0.5 text-neon-primary" />
-                    <span>{item}</span>
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-text-sub">데이터 없음</li>
-              )}
+              {(actionNow.length > 0 ? actionNow : [FALLBACK.line]).map((item, i) => (
+                <li key={i} className="flex items-start text-sm text-text-main/80">
+                  <ArrowRight className="w-4 h-4 mr-3 mt-0.5 text-neon-primary" />
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
           </section>
-
           <section className="space-y-4">
             <h3 className="text-sm font-bold text-accent/80 tracking-wider">피해야 할 행동</h3>
-
             <ul className="space-y-3">
-              {avoidAction.length > 0 ? (
-                avoidAction.map((item, i) => (
-                  <li key={i} className="flex items-start text-sm text-text-main/80">
-                    <XCircle className="w-4 h-4 mr-3 mt-0.5 text-accent" />
-                    <span>{item}</span>
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-text-sub">데이터 없음</li>
-              )}
+              {(avoidAction.length > 0 ? avoidAction : [FALLBACK.line]).map((item, i) => (
+                <li key={i} className="flex items-start text-sm text-text-main/80">
+                  <XCircle className="w-4 h-4 mr-3 mt-0.5 text-accent" />
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
           </section>
         </div>
+        </>
+        )}
       </NeonCard>
 
+      {!isToday && (
       <NeonCard className="bg-bg-end/80 border-neon-secondary/30" glowColor="secondary">
         <div className="space-y-6">
           <div className="flex items-start justify-between">
@@ -595,6 +568,7 @@ export default function ResultCard({
           </GlowButton>
         </div>
       </NeonCard>
+      )}
     </motion.div>
   );
 }
