@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { SajuProfile, UnifiedSajuResult } from '../services/geminiService';
+import type { SajuProfile, DisplaySajuResult } from "../types/saju";
 import { motion } from 'motion/react';
 import {
   Sparkles,
@@ -16,8 +16,8 @@ type Category = { titleKr?: string; titleEn?: string } | null;
 
 interface Props {
   profile: SajuProfile;
-  summary: UnifiedSajuResult | null;
-  reading: UnifiedSajuResult | null;
+  summary: DisplaySajuResult | null;
+  reading: DisplaySajuResult | null;
   category: Category;
   categoryId?: string | null;
   isLoading: boolean;

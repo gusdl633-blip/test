@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { MessageSquare, Send } from "lucide-react";
-import type { SajuProfile, UnifiedSajuResult } from "../services/geminiService";
-import { chatWithSaju } from "../services/geminiService";
+import type { SajuProfile, DisplaySajuResult } from "../types/saju";
+import { chatReplyWithProfile } from "../services/sajuChatService";
 
 type ChatRole = "user" | "assistant";
 
@@ -14,8 +14,8 @@ interface ChatInterfaceProps {
   profile: SajuProfile;
   sessionId: string;
   initialMessage?: string;
-  summary?: UnifiedSajuResult | null;
-  reading?: UnifiedSajuResult | null;
+  summary?: DisplaySajuResult | null;
+  reading?: DisplaySajuResult | null;
 }
 
 const QUICK_QUESTIONS = [
@@ -114,13 +114,18 @@ export default function ChatInterface({
         hasReading: !!reading,
       });
 
-      const result = await chatWithSaju(
+      const recentMessages = messages.slice(-6).map((m) => ({
+        role: m.role === "user" ? ("user" as const) : ("model" as const),
+        text: m.message,
+      }));
+
+      const result = await chatReplyWithProfile(
         profile,
-        summary,
-        reading,
+        summary ?? reading,
         text,
         sessionId,
-        requestId
+        requestId,
+        recentMessages
       );
 
       const assistantText =

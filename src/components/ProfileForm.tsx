@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SajuProfile } from '../services/geminiService';
+import type { SajuProfile } from "../types/saju";
 import NeonCard from './ui/NeonCard';
 import GlowButton from './ui/GlowButton';
 import GlassInput from './ui/GlassInput';

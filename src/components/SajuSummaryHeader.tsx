@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { User, Calendar, Zap, Info } from 'lucide-react';
-import { UnifiedSajuResult } from '../services/geminiService';
+import type { DisplaySajuResult } from "../types/saju";
 
 interface Props {
-  data?: UnifiedSajuResult;
+  data?: DisplaySajuResult;
 }
 
 const elementColors: Record<string, string> = {

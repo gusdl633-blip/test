@@ -4,12 +4,18 @@ import ResultCard from "./components/ResultCard";
 import ChatInterface from "./components/ChatInterface";
 import CategoryCard from "./components/ui/CategoryCard";
 import SajuSummaryHeader from "./components/SajuSummaryHeader";
-import {
+import type {
   SajuProfile,
-  UnifiedSajuResult,
-  generateSajuReading,
-  generateUnifiedSaju,
-} from "./services/geminiService";
+  SajuData,
+  DisplaySajuResult,
+  SajuSummaryResult,
+  SajuCategoryReadingResult,
+} from "./types/saju";
+import {
+  buildSajuData,
+  getSummary as getSajuSummary,
+  getReading as getSajuReading,
+} from "./services/sajuOrchestrator";
 import { FORTUNE_CATEGORIES } from "./constants/fortuneCategories";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from "lucide-react";
@@ -21,8 +27,9 @@ type AppScreen = "setup" | "home" | "result" | "consult";
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>("setup");
   const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [summary, setSummary] = useState<UnifiedSajuResult | null>(null);
-  const [reading, setReading] = useState<UnifiedSajuResult | null>(null);
+  const [sajuData, setSajuData] = useState<SajuData | null>(null);
+  const [summary, setSummary] = useState<DisplaySajuResult | null>(null);
+  const [reading, setReading] = useState<DisplaySajuResult | null>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -36,21 +43,102 @@ export default function App() {
 
   const [initialChatInput, setInitialChatInput] = useState<string>("");
 
-  const fetchSummary = async (data: SajuProfile) => {
+  const toDisplaySummary = (core: SajuData, base: SajuSummaryResult): DisplaySajuResult => {
+    const { profile: p, calculated } = core;
+    return {
+      session_id: base.session_id,
+      request_id: base.request_id,
+      profile: {
+        name: p.name || "",
+        birth: p.birthDate || "",
+        calendar: String(p.calendarType || ""),
+        time: p.birthTime || "",
+        ilgan: calculated.profile.ilgan,
+        ilgan_display: calculated.profile.ilgan_display,
+        mbti: p.mbti || "",
+        zodiac_korean: p.zodiac_korean || "",
+        enneagram: p.enneagram || "",
+      },
+      badges: calculated.badges,
+      pillar: calculated.pillar,
+      elements: calculated.elements,
+      sinsal: calculated.sinsal,
+      extended_identity: {
+        human_type: "",
+        core_engine: "",
+        thinking_style: "",
+        instinct_style: "",
+        motivation_core: "",
+        weakness_pattern: "",
+        relationship_pattern: "",
+      },
+      analysis: {
+        core_analysis: [],
+        logic_basis: [],
+        good_flow: [],
+        risk_flow: [],
+        action_now: [],
+        avoid_action: [],
+      },
+      summary: { tone: "entp_shaman_female_30s", one_liner: base.summary.one_liner },
+      human_type_card: {
+        title: "",
+        strengths: [],
+        weaknesses: [],
+        share_summary: "",
+      },
+      chat_seed_questions: [],
+      original: {
+        pillar: calculated.pillar,
+        elements: calculated.elements,
+        sinsal: calculated.sinsal,
+        badges: calculated.badges,
+      },
+    };
+  };
+
+  const toDisplayReading = (core: SajuData, readingCore: SajuCategoryReadingResult): DisplaySajuResult => {
+    const { calculated } = core;
+    return {
+      session_id: readingCore.session_id,
+      request_id: readingCore.request_id,
+      profile: readingCore.profile,
+      badges: calculated.badges,
+      pillar: calculated.pillar,
+      elements: calculated.elements,
+      sinsal: calculated.sinsal,
+      extended_identity: readingCore.extended_identity,
+      analysis: readingCore.analysis,
+      summary: { tone: "entp_shaman_female_30s", one_liner: readingCore.summary.one_liner },
+      human_type_card: readingCore.human_type_card,
+      chat_seed_questions: [],
+      original: {
+        pillar: calculated.pillar,
+        elements: calculated.elements,
+        sinsal: calculated.sinsal,
+        badges: calculated.badges,
+      },
+    };
+  };
+
+  const loadSummary = async (data: SajuProfile) => {
     if (isFetchingSummary) return;
 
     setIsFetchingSummary(true);
     try {
       setErrorMessage(null);
       const requestId = Math.random().toString(36).substring(7);
-      const fixed = await generateUnifiedSaju(data, sessionId, requestId);
+      const core = buildSajuData(data);
+      setSajuData(core);
+      const base = await getSajuSummary(core, sessionId, requestId);
+      const display = toDisplaySummary(core, base);
       setProfile(data);
-      setSummary(fixed);
-    } catch (error: any) {
+      setSummary(display);
+    } catch (error: unknown) {
       console.error("fetchSummary failed:", error);
       setErrorMessage("기본 사주 요약을 불러오지 못했다.\n잠시 후 다시 시도해라.");
       setRetryAction(() => async () => {
-        await fetchSummary(data);
+        await loadSummary(data);
       });
     } finally {
       setIsFetchingSummary(false);
@@ -71,7 +159,7 @@ export default function App() {
 
     setScreen("home");
     console.log("[APP FLOW] setup -> home");
-    await fetchSummary(data);
+    await loadSummary(data);
   };
 
   const handleCategorySelect = async (categoryId: string) => {
@@ -90,34 +178,32 @@ export default function App() {
         setErrorMessage(null);
         setIsLoading(true);
 
-        const result = await generateSajuReading(profile, categoryId, sessionId, requestId);
-
-        console.log("CATEGORY RESULT:", result);
-        console.log("SUMMARY:", result?.summary);
-        console.log("ONE LINER:", result?.summary?.one_liner);
-        console.log("[SAJU] setReading about to run:", {
-          hasSummary: !!result?.summary?.one_liner,
-          core_analysis_len: result?.analysis?.core_analysis?.filter(Boolean).length ?? 0,
-          core_engine: result?.extended_identity?.core_engine,
-          thinking_style: result?.extended_identity?.thinking_style,
-          instinct_style: result?.extended_identity?.instinct_style,
-          motivation_core: result?.extended_identity?.motivation_core,
-          weakness_pattern: result?.extended_identity?.weakness_pattern,
-          relationship_pattern: result?.extended_identity?.relationship_pattern,
-          human_type_title: result?.human_type_card?.title,
-        });
-
-        setReading(result);
-      } catch (error: any) {
-        console.error("generateSajuReading failed:", error);
-
+        if (!summary) {
+          setErrorMessage("먼저 요약을 불러와야 합니다.");
+          return;
+        }
+        const core = sajuData ?? buildSajuData(profile);
+        if (!sajuData) {
+          setSajuData(core);
+        }
+        const summaryForReading: SajuSummaryResult | null = summary
+          ? {
+              session_id: summary.session_id,
+              request_id: summary.request_id,
+              profile: summary.profile,
+              summary: { one_liner: summary.summary.one_liner },
+            }
+          : null;
+        const readingCore = await getSajuReading(core, summaryForReading, categoryId, sessionId, requestId);
+        const displayReading = toDisplayReading(core, readingCore);
+        setReading(displayReading);
+      } catch (error: unknown) {
+        console.error("fetchCategoryReading failed:", error);
+        const msg = error instanceof Error ? error.message : String(error);
         const message =
-          error?.message?.includes("503") ||
-          error?.message?.includes("UNAVAILABLE") ||
-          error?.message?.includes("high demand")
+          msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("high demand")
             ? "지금 해석 엔진 요청이 몰렸다.\n몇 초 뒤 다시 시도해라."
             : "카테고리 해석 중 문제가 생겼다.\n잠시 후 다시 시도해라.";
-
         setErrorMessage(message);
         setRetryAction(() => run);
       } finally {
@@ -141,6 +227,7 @@ export default function App() {
     setSummary(null);
     setReading(null);
     setCurrentCategory(null);
+    setSajuData(null);
     setInitialChatInput("");
     setErrorMessage(null);
     setRetryAction(null);
@@ -199,7 +286,7 @@ export default function App() {
         return;
       }
       setScreen("home");
-      fetchSummary(parsedProfile);
+      loadSummary(parsedProfile);
     } catch (e) {
       console.error("failed to parse saved profile", e);
       localStorage.removeItem("saju_profile");
