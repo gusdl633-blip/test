@@ -2,12 +2,13 @@ import React from "react";
 import { Sparkles, Coins, Heart, Briefcase, Activity, Calendar, Sun } from "lucide-react";
 
 type CategoryCardProps = {
+  key?: React.Key;
   index: number;
   titleKr: string;
   titleEn: string;
   subtitle: string;
   icon: string;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 };
 
 const iconMap: Record<string, React.ReactNode> = {

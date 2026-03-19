@@ -39,7 +39,7 @@ export default function ProfileForm({ onSubmit }: Props) {
     e.preventDefault();
     onSubmit({
       ...formData,
-      enneagram: formData.enneagram?.trim() || null
+      enneagram: formData.enneagram?.trim() || undefined
     });
   };
 

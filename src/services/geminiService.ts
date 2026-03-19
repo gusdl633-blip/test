@@ -33,13 +33,24 @@ const SAJU_CHAT_LENGTH_RULES = `
 `.trim();
 
 const CHAT_MIN_LENGTH = 100;
-const CHAT_EXTENSION = " 결국 이 패턴을 못 바꾸면 같은 결과로 반복된다.";
+const CHAT_EXTENSION = " 방향을 바꾸고 싶으면 지금 움직여라.";
 
 function ensureMinLength(text: string, minLen: number = CHAT_MIN_LENGTH): string {
   if (!text || typeof text !== "string") return text;
   const t = text.trim();
   if (t.length >= minLen) return t;
   return t + CHAT_EXTENSION;
+}
+
+function cleanRepeat(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  let t = text
+    .replace(/결국 .* 반복된다\.?/g, "")
+    .replace(/같은 결과로 반복된다\.?/g, "")
+    .replace(/이 패턴을 못 바꾸면 같은 결과로 반복된다\.?/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return t;
 }
 
 async function callGemini<T>(payload: {
@@ -957,6 +968,16 @@ ${categoryPrompt}
   return mapped;
 }
 
+/** Chat: system instruction for Q&A only. No analysis regeneration. */
+const SAJU_CHAT_QA_SYSTEM = `
+사용자의 질문에 답하는 사주 상담가다. 분석을 다시 뽑지 말고, 질문에만 답해라.
+- 반드시 질문에 먼저 답한다. 기존 분석 문단을 반복하지 마라.
+- 같은 문장·같은 패턴 반복 금지. 질문과 무관한 설명 금지.
+- 반말·직설. "너", "너는", "너가" 금지. 주어 생략.
+- 답변만 한국어로 출력한다. JSON·코드 블록·마크다운 사용하지 마라. 평문만.
+- 최소 100자 이상. 1) 질문에 대한 직접 답변 2) 사주 기반 이유 3) 현실적 조언 순으로.
+`.trim();
+
 export async function chatWithSaju(
   profile: SajuProfile,
   summary: UnifiedSajuResult | null,
@@ -967,73 +988,35 @@ export async function chatWithSaju(
 ): Promise<UnifiedSajuResult> {
   const fixed = summary ?? (await generateUnifiedSaju(profile, sessionId, requestId));
 
+  const ilgan = fixed.badges?.ilgan ?? (fixed.profile as { ilgan?: string })?.ilgan ?? "";
+  const el = fixed.elements as { wood?: number; fire?: number; earth?: number; metal?: number; water?: number } | undefined;
+  const elements = el
+    ? `목=${el.wood ?? 0} 화=${el.fire ?? 0} 토=${el.earth ?? 0} 금=${el.metal ?? 0} 수=${el.water ?? 0}`
+    : "";
+  const summaryLines =
+    (fixed.summary?.one_liner ?? "").trim() ||
+    (reading?.summary?.one_liner ?? "").trim() ||
+    "사주 요약 없음";
+  const compactContext = [ilgan && `일간: ${ilgan}`, elements && `오행: ${elements}`, summaryLines].filter(Boolean).join("\n");
+
   const prompt = `
-사주 기반 상담 엔진이다.
-
-아래는 이미 확정된 사용자 데이터다.
-절대 바꾸지 말고, 이 값을 근거로만 답해라.
-
-[프로필]
-${JSON.stringify(fixed.profile, null, 2)}
-
-[사주 구조]
-${JSON.stringify(
-  {
-    pillar: fixed.pillar,
-    elements: fixed.elements,
-    hidden_elements: (fixed as any).hidden_elements,
-    visible_ten_gods: (fixed as any).visible_ten_gods,
-    hidden_ten_gods: (fixed as any).hidden_ten_gods,
-    badges: fixed.badges,
-    sinsal: fixed.sinsal,
-    daewoon: (fixed as any).daewoon,
-  },
-  null,
-  2
-)}
-
-[현재 보고 있던 리딩]
-${JSON.stringify(reading ?? {}, null, 2)}
-
 [사용자 질문]
 ${userInput}
 
-반드시 한국어로만 답해라. JSON만 반환해라.
-상담 응답은 최소 100자 이상으로 써라. 2~4문장 이어서. 한 문장만 금지.
-문장 스타일: "너", "너는", "너가" 금지. 주어 생략한 직설체. "~하는 시기다" "~경향이 있다" 금지. "지금 ~다" 써라.
+[사주 핵심 정보]
+${compactContext}
 
-반환 JSON 스키마(이 구조만 반환):
-{
-  "analysis": ["string", "string", "string"],
-  "structure": {
-    "coreEngine": "string",
-    "thinkingAlgorithm": "string",
-    "instinctTemperament": "string",
-    "motivationCore": "string",
-    "weaknessPattern": "string",
-    "relationshipPattern": "string"
-  },
-  "humanType": {
-    "title": "string",
-    "strengths": ["string","string","string"],
-    "weaknesses": ["string","string","string"],
-    "shareSummary": "string"
-  },
-  "evidence": ["string","string","string"],
-  "goodFlow": ["string","string","string"],
-  "riskSignals": ["string","string","string"],
-  "actions": ["string","string","string"],
-  "avoidActions": ["string","string","string"]
-}
+규칙: 위 질문에만 직접 답해라. 전체 분석을 다시 쓰지 마라. 같은 문장 반복 금지. 답변만 평문으로 출력해라. JSON 사용 금지. 최소 100자 이상.
 `.trim();
 
-  console.log("[SAJU PROMPT STYLE]", { mode: "chat", persona: "ENTP_SHAMAN" });
+  console.log("[CHAT QUESTION USED]", userInput);
+  console.log("[CHAT PROMPT SENT]", { promptPreview: prompt.slice(0, 400) + "…", userInputLength: userInput.length });
 
   let rawText: string;
   try {
     rawText = await getGeminiRawText({
       prompt,
-      systemInstruction: `${SAJU_PERSONA_SYSTEM}\n\n${SAJU_CHAT_LENGTH_RULES}`,
+      systemInstruction: SAJU_CHAT_QA_SYSTEM,
       history: [],
     });
   } catch (err) {
@@ -1043,25 +1026,39 @@ ${userInput}
 
   console.log("[CHAT RAW RESPONSE]", rawText?.slice(0, 300) + (rawText?.length > 300 ? "…" : ""));
 
-  const mapped = safeParseAndNormalizeCategoryReading(rawText, fixed);
+  let answerText =
+    typeof rawText === "string"
+      ? rawText.replace(/```[\s\S]*?```/g, "").trim()
+      : "";
+  if (answerText.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(answerText) as { summary?: { one_liner?: string }; analysis?: string[] };
+      const fromSummary = parsed?.summary?.one_liner?.trim();
+      const fromAnalysis = Array.isArray(parsed?.analysis) ? parsed.analysis.filter(Boolean).join(" ") : "";
+      answerText = (fromSummary || fromAnalysis || answerText).trim();
+    } catch {
+      answerText = rawText.trim();
+    }
+  }
+  if (!answerText && typeof rawText === "string") answerText = rawText.trim();
+  if (!answerText) answerText = "질문에 대한 답을 생성하지 못했다. 다시 한 번 짧게 물어봐라.";
+  answerText = cleanRepeat(answerText);
+  const processedResponse = ensureMinLength(answerText);
 
-  const rawDisplayText =
-    (mapped.summary?.one_liner ?? "").trim() ||
-    (mapped.analysis?.core_analysis?.filter(Boolean)[0] ?? "") ||
-    (mapped.analysis?.logic_basis?.filter(Boolean)[0] ?? "") ||
-    "";
-  const processedResponse = ensureMinLength(rawDisplayText);
-  mapped.summary = { ...mapped.summary, one_liner: processedResponse };
+  const mapped: UnifiedSajuResult = {
+    ...fixed,
+    summary: { ...fixed.summary, one_liner: processedResponse },
+    original: fixed.original ?? {
+      pillar: fixed.pillar,
+      elements: fixed.elements,
+      sinsal: fixed.sinsal,
+      badges: fixed.badges,
+    },
+  };
 
   console.log("[CHAT FINAL RESPONSE]", {
     length: processedResponse.length,
     preview: processedResponse.slice(0, 120) + (processedResponse.length > 120 ? "…" : ""),
-  });
-
-  console.log("[SAJU][chat] mapped result:", {
-    one_liner: mapped.summary?.one_liner,
-    core_analysis_len: mapped.analysis?.core_analysis?.filter(Boolean).length ?? 0,
-    core_engine: mapped.extended_identity?.core_engine,
   });
 
   return mapped;

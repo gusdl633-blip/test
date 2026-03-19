@@ -11,7 +11,7 @@ import {
   generateUnifiedSaju,
 } from "./services/geminiService";
 import { FORTUNE_CATEGORIES } from "./constants/fortuneCategories";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, MessageSquare, User as UserIcon, LogOut } from "lucide-react";
 import ErrorModal from "./components/ErrorModal";
 
@@ -473,7 +473,6 @@ export default function App() {
 
       <ErrorModal
         open={!!errorMessage}
-        title="해석 중 오류가 났다"
         message={errorMessage || ""}
         onRetry={retryAction || undefined}
         onClose={() => {
