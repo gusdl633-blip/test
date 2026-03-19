@@ -1,0 +1,20 @@
+# Python backend – not used by Vercel frontend build
+# Prevents Vercel from detecting Python and running wrong build
+requirements.txt
+pyproject.toml
+Pipfile
+Pipfile.lock
+*.py
+engine/
+__pycache__/
+*.pyc
+.python/
+venv/
+.venv/
+env/
+
+# Local / dev
+.env.local
+.env.*.local
+*.log
+.DS_Store

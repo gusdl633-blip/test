@@ -1,7 +1,6 @@
 {
-  "functions": {
-    "api/**/*.py": {
-      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,fixtures/**,__fixtures__/**,testdata/**,sample-data/**,static/**,assets/**}"
-    }
-  }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": null,
+  "installCommand": "npm install"
 }
