@@ -1,10 +1,11 @@
 /**
  * Gemini API integration (frontend only).
  * API key: import.meta.env.VITE_GEMINI_API_KEY
- * No /api/* calls.
+ * No app backend HTTP routes — only Gemini REST from the browser.
  */
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent";
 
 export type SajuData = {
   name?: string;
@@ -78,7 +79,7 @@ function getApiKey(): string {
 }
 
 /**
- * gemini-1.5-flash REST v1 rejects top-level `systemInstruction` in the JSON body.
+ * gemini-1.5-flash-latest (REST v1) rejects top-level `systemInstruction` in the JSON body.
  * Merge rules into a single user message instead.
  */
 function mergeSystemAndUserPrompt(userPrompt: string, systemRules?: string): string {

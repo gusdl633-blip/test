@@ -1,5 +1,5 @@
 /**
  * Re-exports frontend-only saju calculation.
- * All /api/saju calls have been removed; calculation runs in browser.
+ * Legacy server saju endpoints are not used; calculation runs in the browser only.
  */
 export { calculateSajuFromProfile, type CalculatedSaju } from "./saju";
