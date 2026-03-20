@@ -1,16 +1,13 @@
 import type {
-  DisplaySajuResult,
   SajuAnalysis,
   SajuCategoryReadingResult,
   SajuData,
   SajuExtendedIdentity,
   SajuHumanTypeCard,
-  SajuProfile,
   SajuSummaryResult,
 } from "../types/saju";
 import { FORTUNE_CATEGORIES, type FortuneCategoryId } from "../constants/fortuneCategories";
 import { generateSajuCategoryReading } from "../lib/gemini";
-import { buildSajuData } from "./buildSajuData";
 
 const SAJU_PERSONA_SYSTEM = `
 너는 사주 기반 카테고리 해석 엔진이다.
@@ -31,11 +28,10 @@ function normalizeText(v: unknown): string {
   return v.trim().replace(/\s+/g, " ");
 }
 
-function normalizeArr(v: unknown, n = 3): string[] {
+/** Non-empty strings only — avoids ResultCard showing blank “filled” slots. */
+function normalizeStringList(v: unknown, maxItems = 8): string[] {
   const src = Array.isArray(v) ? v : [];
-  const out = src.slice(0, n).map((x) => normalizeText(x));
-  while (out.length < n) out.push("");
-  return out;
+  return src.map((x) => normalizeText(x)).filter(Boolean).slice(0, maxItems);
 }
 
 function resultProfileFromSajuData(sajuData: SajuData): SajuCategoryReadingResult["profile"] {
@@ -97,6 +93,130 @@ function parseReadingJson(rawText: string): ReadingJson {
   return {};
 }
 
+function stripFences(raw: string): string {
+  return raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
+/** Any user-visible string in the parsed JSON tree (for empty-schema fallback). */
+function collectStringLeaves(obj: unknown, out: string[] = []): string[] {
+  if (typeof obj === "string") {
+    const t = normalizeText(obj);
+    if (t) out.push(t);
+  } else if (Array.isArray(obj)) {
+    obj.forEach((x) => collectStringLeaves(x, out));
+  } else if (obj && typeof obj === "object") {
+    Object.values(obj).forEach((x) => collectStringLeaves(x, out));
+  }
+  return out;
+}
+
+function parsedHasDisplayableContent(p: ReadingJson): boolean {
+  if (normalizeText(p.summary)) return true;
+  const core = p.analysis?.core_analysis;
+  if (Array.isArray(core) && core.some((x) => normalizeText(x))) return true;
+  if (p.extended_identity && Object.values(p.extended_identity).some((v) => normalizeText(v as string)))
+    return true;
+  if (p.human_type_card?.title && normalizeText(p.human_type_card.title)) return true;
+  const h = p.human_type_card;
+  if (h && Array.isArray(h.strengths) && h.strengths.some((x) => normalizeText(x))) return true;
+  if (h && Array.isArray(h.weaknesses) && h.weaknesses.some((x) => normalizeText(x))) return true;
+  return false;
+}
+
+function firstMeaningfulSentence(text: string, maxLen = 220): string {
+  const t = normalizeText(text);
+  if (!t) return "";
+  const byStop = t.split(/(?<=[.!?。])\s+/);
+  for (const s of byStop) {
+    const n = normalizeText(s);
+    if (n.length >= 8) return n.slice(0, maxLen);
+  }
+  const line = t
+    .split(/\n/)
+    .map(normalizeText)
+    .find((l) => l.length >= 4);
+  if (line) return line.slice(0, maxLen);
+  return t.slice(0, maxLen);
+}
+
+function splitCoreParagraphs(text: string, max = 10): string[] {
+  const t = normalizeText(text.replace(/\r\n/g, "\n"));
+  if (!t) return [];
+  let parts = t
+    .split(/\n{2,}/)
+    .map((p) => normalizeText(p))
+    .filter(Boolean);
+  if (parts.length === 0) return [];
+  if (parts.length === 1 && parts[0].length > 700) {
+    const sentences = parts[0]
+      .split(/(?<=[.!?。])\s+/)
+      .map((s) => normalizeText(s))
+      .filter(Boolean);
+    return sentences.slice(0, max);
+  }
+  return parts.slice(0, max);
+}
+
+/**
+ * If Gemini returns prose or empty JSON slots, merge into a displayable ReadingJson.
+ * (Previously: parse failed → {} → normalizeArr padded "", → ResultCard filter(Boolean) === 0 → “empty” UI.)
+ */
+function enrichReadingFromRaw(
+  raw: string,
+  parsed: ReadingJson,
+  categoryId: string,
+  categoryLabel: string,
+  summaryHint: string
+): ReadingJson {
+  const trimmed = raw.trim();
+  if (!trimmed) return parsed;
+
+  if (parsedHasDisplayableContent(parsed)) return parsed;
+
+  const stripped = stripFences(trimmed);
+  const leaves = collectStringLeaves(parsed);
+
+  if (leaves.length > 0) {
+    const headline = firstMeaningfulSentence(leaves.join(" ")) || leaves[0];
+    return {
+      ...parsed,
+      summary: normalizeText(parsed.summary) || headline,
+      analysis: {
+        ...parsed.analysis,
+        core_analysis: leaves.slice(0, 10),
+      },
+    };
+  }
+
+  if (/^\s*\{/.test(stripped) && !parsedHasDisplayableContent(parsed)) {
+    const msg =
+      summaryHint ||
+      "모델이 비어 있는 JSON을 반환했습니다. 잠시 후 카테고리를 다시 선택해 주세요.";
+    return {
+      summary: msg,
+      analysis: {
+        core_analysis: [msg],
+      },
+    };
+  }
+
+  const headline =
+    firstMeaningfulSentence(stripped) ||
+    `${categoryLabel} 운세`.trim() ||
+    `${categoryId} 카테고리 해석`;
+  let core = splitCoreParagraphs(stripped, 12);
+  if (core.length === 0) core = [stripped.slice(0, 4000) || headline];
+
+  return {
+    ...parsed,
+    summary: normalizeText(parsed.summary) || headline,
+    analysis: {
+      ...parsed.analysis,
+      core_analysis: core,
+    },
+  };
+}
+
 function toReadingResult(
   sajuData: SajuData,
   summary: SajuSummaryResult | null,
@@ -109,13 +229,21 @@ function toReadingResult(
     summary?.summary?.one_liner ||
     "카테고리 해석을 불러오는 중입니다.";
 
+  let core_analysis = normalizeStringList(parsed.analysis?.core_analysis);
+  if (core_analysis.length === 0 && normalizeText(parsed.summary)) {
+    core_analysis = [normalizeText(parsed.summary)];
+  }
+  if (core_analysis.length === 0) {
+    core_analysis = [oneLiner];
+  }
+
   const analysis: SajuAnalysis = {
-    core_analysis: normalizeArr(parsed.analysis?.core_analysis),
-    logic_basis: normalizeArr(parsed.analysis?.logic_basis),
-    good_flow: normalizeArr(parsed.analysis?.good_flow),
-    risk_flow: normalizeArr(parsed.analysis?.risk_flow),
-    action_now: normalizeArr(parsed.analysis?.action_now),
-    avoid_action: normalizeArr(parsed.analysis?.avoid_action),
+    core_analysis,
+    logic_basis: normalizeStringList(parsed.analysis?.logic_basis),
+    good_flow: normalizeStringList(parsed.analysis?.good_flow),
+    risk_flow: normalizeStringList(parsed.analysis?.risk_flow),
+    action_now: normalizeStringList(parsed.analysis?.action_now),
+    avoid_action: normalizeStringList(parsed.analysis?.avoid_action),
   };
 
   const extended_identity: SajuExtendedIdentity = {
@@ -131,12 +259,12 @@ function toReadingResult(
 
   const human_type_card: SajuHumanTypeCard = {
     title: normalizeText(parsed.human_type_card?.title),
-    strengths: normalizeArr(parsed.human_type_card?.strengths),
-    weaknesses: normalizeArr(parsed.human_type_card?.weaknesses),
+    strengths: normalizeStringList(parsed.human_type_card?.strengths),
+    weaknesses: normalizeStringList(parsed.human_type_card?.weaknesses),
     share_summary: normalizeText(parsed.human_type_card?.share_summary),
   };
 
-  return {
+  const result: SajuCategoryReadingResult = {
     session_id: sessionId,
     request_id: requestId,
     profile: resultProfileFromSajuData(sajuData),
@@ -145,6 +273,16 @@ function toReadingResult(
     extended_identity,
     human_type_card,
   };
+
+  if (import.meta.env.DEV) {
+    console.info("[SAJU][reading] normalized SajuCategoryReadingResult", {
+      one_liner: result.summary.one_liner,
+      core_analysis_len: result.analysis.core_analysis.length,
+      core_preview: result.analysis.core_analysis[0]?.slice(0, 120),
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -227,41 +365,39 @@ ${JSON.stringify(core, null, 2)}
     console.error("[sajuReadingService/getReading] failed:", error);
   }
 
-  return toReadingResult(sajuData, summary, sessionId, requestId, parseReadingJson(raw));
-}
+  if (import.meta.env.DEV) {
+    console.info("[SAJU][reading] raw Gemini category text", {
+      categoryId,
+      length: raw.length,
+      preview: raw.slice(0, 400),
+    });
+  }
 
-/** Convert SajuCategoryReadingResult to DisplaySajuResult for UI. */
-function toDisplayReading(sajuData: SajuData, reading: SajuCategoryReadingResult): DisplaySajuResult {
-  const { calculated } = sajuData;
-  return {
-    ...reading,
-    summary: { tone: "entp_shaman_female_30s", one_liner: reading.summary.one_liner },
-    badges: calculated.badges,
-    pillar: calculated.pillar,
-    elements: calculated.elements,
-    sinsal: calculated.sinsal,
-    chat_seed_questions: [],
-    original: {
-      pillar: calculated.pillar,
-      elements: calculated.elements,
-      sinsal: calculated.sinsal,
-      badges: calculated.badges,
-    },
-  };
-}
+  const parsedJson = parseReadingJson(raw);
+  if (import.meta.env.DEV) {
+    console.info("[SAJU][reading] parseReadingJson result", {
+      keys: Object.keys(parsedJson),
+      hasDisplayable: parsedHasDisplayableContent(parsedJson),
+    });
+  }
 
-/**
- * Backward-compat: build SajuData from profile, call getReading, convert to DisplaySajuResult for UI.
- * Prefer getReading(sajuData, summary, ...) when App stores sajuData.
- */
-export async function fetchCategoryReading(
-  profile: SajuProfile,
-  summary: SajuSummaryResult | null,
-  categoryId: string,
-  sessionId: string,
-  requestId: string
-): Promise<DisplaySajuResult> {
-  const sajuData = buildSajuData(profile);
-  const reading = await getReading(sajuData, summary, categoryId, sessionId, requestId);
-  return toDisplayReading(sajuData, reading);
+  const enriched = enrichReadingFromRaw(
+    raw,
+    parsedJson,
+    categoryId,
+    label,
+    summary?.summary?.one_liner ?? ""
+  );
+
+  if (import.meta.env.DEV) {
+    const sum = enriched.summary;
+    console.info("[SAJU][reading] after enrichReadingFromRaw", {
+      summary: typeof sum === "string" ? sum.slice(0, 120) : sum,
+      core_len: Array.isArray(enriched.analysis?.core_analysis)
+        ? enriched.analysis!.core_analysis!.length
+        : 0,
+    });
+  }
+
+  return toReadingResult(sajuData, summary, sessionId, requestId, enriched);
 }

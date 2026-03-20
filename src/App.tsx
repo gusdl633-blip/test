@@ -182,9 +182,9 @@ export default function App() {
           setErrorMessage("먼저 요약을 불러와야 합니다.");
           return;
         }
-        const core = sajuData ?? buildSajuData(profile);
         if (!sajuData) {
-          setSajuData(core);
+          setErrorMessage("사주 데이터가 없습니다. 요약을 다시 불러온 뒤 카테고리를 선택해라.");
+          return;
         }
         const summaryForReading: SajuSummaryResult | null = summary
           ? {
@@ -194,11 +194,11 @@ export default function App() {
               summary: { one_liner: summary.summary.one_liner },
             }
           : null;
-        const readingCore = await getSajuReading(core, summaryForReading, categoryId, sessionId, requestId);
-        const displayReading = toDisplayReading(core, readingCore);
+        const readingCore = await getSajuReading(sajuData, summaryForReading, categoryId, sessionId, requestId);
+        const displayReading = toDisplayReading(sajuData, readingCore);
         setReading(displayReading);
       } catch (error: unknown) {
-        console.error("fetchCategoryReading failed:", error);
+        console.error("getReading (category) failed:", error);
         const msg = error instanceof Error ? error.message : String(error);
         const message =
           msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("high demand")

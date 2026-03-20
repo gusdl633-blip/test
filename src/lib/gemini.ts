@@ -4,8 +4,17 @@
  * No app backend HTTP routes — only Gemini REST from the browser.
  */
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent";
+/** Model id for REST v1 generateContent (must exist for your API key). */
+export const GEMINI_MODEL_ID = "gemini-2.5-flash";
+
+/**
+ * Full generateContent URL (API key is appended as `?key=` at request time).
+ * @temporary DEBUG — also logged in dev on each Gemini call.
+ */
+export const GEMINI_GENERATE_CONTENT_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL_ID}:generateContent`;
+
+/** @temporary DEBUG — app source has no fetch to local /api/saju; Gemini only. */
+export const RUNTIME_FETCHES_API_SAJU = false as const;
 
 export type SajuData = {
   name?: string;
@@ -79,8 +88,7 @@ function getApiKey(): string {
 }
 
 /**
- * gemini-1.5-flash-latest (REST v1) rejects top-level `systemInstruction` in the JSON body.
- * Merge rules into a single user message instead.
+ * REST v1 generateContent rejects top-level `systemInstruction` for this stack; merge rules into the user text.
  */
 function mergeSystemAndUserPrompt(userPrompt: string, systemRules?: string): string {
   const trimmed = systemRules?.trim();
@@ -99,7 +107,12 @@ async function callGemini(prompt: string, systemInstruction?: string): Promise<s
     },
   };
 
-  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+  if (import.meta.env.DEV) {
+    console.info("[SAJU][debug] Gemini POST (exact path, no key):", GEMINI_GENERATE_CONTENT_URL);
+    console.info("[SAJU][debug] App runtime fetch /api/saju:", RUNTIME_FETCHES_API_SAJU, "(must stay false)");
+  }
+
+  const res = await fetch(`${GEMINI_GENERATE_CONTENT_URL}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -1,14 +1,17 @@
-console.log('KEY:', import.meta.env.VITE_GEMINI_API_KEY);
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
+import "./index.css";
+import { GEMINI_GENERATE_CONTENT_URL, GEMINI_MODEL_ID, RUNTIME_FETCHES_API_SAJU } from "./lib/gemini";
 
-// Debug: confirm Vite env is available in browser (remove in production)
-console.log('KEY:', import.meta.env.VITE_GEMINI_API_KEY);
+if (import.meta.env.DEV) {
+  console.info("[SAJU][debug] startup model:", GEMINI_MODEL_ID);
+  console.info("[SAJU][debug] startup Gemini URL (no key):", GEMINI_GENERATE_CONTENT_URL);
+  console.info("[SAJU][debug] startup runtime fetch /api/saju in app:", RUNTIME_FETCHES_API_SAJU);
+}
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 );
