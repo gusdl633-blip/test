@@ -1,2 +1,4 @@
+# Never list `api/` here — Vercel Serverless Functions must be uploaded.
+# Legacy Python / engine artifacts only:
 engine/
 *.py
