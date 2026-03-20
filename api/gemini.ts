@@ -16,11 +16,36 @@ function mergePrompt(prompt: string, systemInstruction?: string): string {
   return `[시스템 규칙]\n${trimmed}\n\n[사용자 데이터]\n${prompt}`;
 }
 
+function bodyTypeOf(value: unknown): string {
+  if (typeof value === "string") return "string";
+  if (Buffer.isBuffer(value)) return "buffer";
+  if (value instanceof Uint8Array) return "uint8array";
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (typeof value === "object") return "object";
+  return typeof value;
+}
+
+function safePreview(value: unknown, maxLen = 120): string {
+  try {
+    if (typeof value === "string") return value.slice(0, maxLen);
+    if (Buffer.isBuffer(value)) return value.toString("utf8").slice(0, maxLen);
+    if (value instanceof Uint8Array) return Buffer.from(value).toString("utf8").slice(0, maxLen);
+    if (value === null) return "null";
+    if (typeof value === "object") return JSON.stringify(value).slice(0, maxLen);
+    return typeof value === "undefined" ? "" : String(value).slice(0, maxLen);
+  } catch {
+    return "";
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed", details: "Use POST" });
     return;
   }
+
+  const isDev = process.env.NODE_ENV === "development" || process.env.VERCEL_ENV === "development";
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -31,29 +56,95 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  let body: GeminiProxyBody = {};
-  const rawBody = req.body;
+  // Robust request-body parsing: accept JSON object OR JSON string OR Buffer/Uint8Array.
+  const rawBody: unknown = req.body;
+  let parsedBody: any = {};
+  const bodyType = bodyTypeOf(rawBody);
+  const rawPreview120 = safePreview(rawBody, 120);
+
   if (typeof rawBody === "string") {
     try {
-      body = JSON.parse(rawBody) as GeminiProxyBody;
+      parsedBody = JSON.parse(rawBody);
     } catch {
-      res.status(400).json({ error: "Invalid JSON body", details: "Could not parse request body" });
+      res.status(400).json({
+        error: "Invalid JSON body",
+        details: {
+          bodyType,
+          preview: rawPreview120,
+        },
+      });
+      return;
+    }
+  } else if (Buffer.isBuffer(rawBody)) {
+    try {
+      parsedBody = JSON.parse(rawBody.toString("utf8"));
+    } catch {
+      res.status(400).json({
+        error: "Invalid JSON body",
+        details: {
+          bodyType,
+          preview: safePreview(rawBody, 120),
+        },
+      });
+      return;
+    }
+  } else if (rawBody instanceof Uint8Array) {
+    try {
+      parsedBody = JSON.parse(Buffer.from(rawBody).toString("utf8"));
+    } catch {
+      res.status(400).json({
+        error: "Invalid JSON body",
+        details: {
+          bodyType,
+          preview: safePreview(rawBody, 120),
+        },
+      });
       return;
     }
   } else if (rawBody && typeof rawBody === "object" && !Array.isArray(rawBody)) {
-    body = rawBody as GeminiProxyBody;
+    parsedBody = rawBody;
   }
 
-  const prompt = typeof body.prompt === "string" ? body.prompt : "";
-  const systemInstruction = typeof body.systemInstruction === "string" ? body.systemInstruction : undefined;
-  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "gemini-2.5-flash";
-  const temperature = typeof body.temperature === "number" && Number.isFinite(body.temperature) ? body.temperature : 0.7;
-  const maxOutputTokens =
-    typeof body.maxOutputTokens === "number" && Number.isFinite(body.maxOutputTokens) ? body.maxOutputTokens : 2048;
+  const promptRaw = (parsedBody ?? {})?.prompt;
+  const promptType = bodyTypeOf(promptRaw);
 
-  const fullPrompt = mergePrompt(prompt, systemInstruction);
+  const {
+    prompt = "",
+    systemInstruction = "",
+    model = "gemini-2.5-flash",
+    temperature = 0.7,
+    maxOutputTokens = 2048,
+  } = (parsedBody ?? {}) as Partial<GeminiProxyBody>;
 
-  const upstreamUrl = `${UPSTREAM}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const promptStr = typeof prompt === "string" ? prompt : "";
+  const systemInstructionStr = typeof systemInstruction === "string" ? systemInstruction : "";
+  const modelStr = typeof model === "string" && model.trim() ? model.trim() : "gemini-2.5-flash";
+  const temperatureNum = typeof temperature === "number" && Number.isFinite(temperature) ? temperature : 0.7;
+  const maxOutputTokensNum =
+    typeof maxOutputTokens === "number" && Number.isFinite(maxOutputTokens) ? maxOutputTokens : 2048;
+
+  if (isDev) {
+    console.info("[SAJU][api/gemini][debug] typeof req.body:", typeof rawBody);
+    console.info("[SAJU][api/gemini][debug] prompt type:", promptType);
+    console.info("[SAJU][api/gemini][debug] prompt preview:", promptStr.slice(0, 120));
+    console.info("[SAJU][api/gemini][debug] selected model:", modelStr);
+  }
+
+  if (!promptStr.trim()) {
+    res.status(400).json({
+      error: "Missing prompt",
+      details: {
+        bodyType,
+        promptType,
+        preview: rawPreview120,
+      },
+    });
+    return;
+  }
+
+  const fullPrompt = mergePrompt(promptStr, systemInstructionStr);
+
+  const upstreamUrl = `${UPSTREAM}/${encodeURIComponent(modelStr)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let upstreamRes: Response;
   try {
@@ -62,7 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { temperature, maxOutputTokens },
+        generationConfig: { temperature: temperatureNum, maxOutputTokens: maxOutputTokensNum },
       }),
     });
   } catch (e) {
