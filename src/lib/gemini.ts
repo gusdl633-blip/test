@@ -77,18 +77,26 @@ function getApiKey(): string {
   return key.trim();
 }
 
+/**
+ * gemini-1.5-flash REST v1 rejects top-level `systemInstruction` in the JSON body.
+ * Merge rules into a single user message instead.
+ */
+function mergeSystemAndUserPrompt(userPrompt: string, systemRules?: string): string {
+  const trimmed = systemRules?.trim();
+  if (!trimmed) return userPrompt;
+  return `[시스템 규칙]\n${trimmed}\n\n[사용자 데이터]\n${userPrompt}`;
+}
+
 async function callGemini(prompt: string, systemInstruction?: string): Promise<string> {
   const apiKey = getApiKey();
-  const body: Record<string, unknown> = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+  const fullPrompt = mergeSystemAndUserPrompt(prompt, systemInstruction);
+  const body = {
+    contents: [{ parts: [{ text: fullPrompt }] }],
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: 2048,
     },
   };
-  if (systemInstruction?.trim()) {
-    body.systemInstruction = { parts: [{ text: systemInstruction.trim() }] };
-  }
 
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
@@ -120,7 +128,7 @@ const CHAT_SYSTEM =
 
 /**
  * Generate saju summary from calculated saju data.
- * Uses systemInstruction; prompt includes name, ilgan, 4 pillars, elements, strength, birth; asks for structured explanation.
+ * System rules are merged into the prompt (no separate systemInstruction field in the API body).
  */
 export async function generateSajuSummary(sajuData: SajuData): Promise<string> {
   const fn = "generateSajuSummary";
@@ -164,7 +172,7 @@ ${lines.join("\n")}
 
 /**
  * Generate chat reply using saju data and conversation history.
- * Uses systemInstruction; prompt includes question, recent history, saju core; instructs direct interpretation, link to ilgan/elements/pattern, no repeated phrases.
+ * System rules are merged into the prompt (no separate systemInstruction field in the API body).
  */
 export async function generateSajuChatReply(
   sajuData: SajuData,
@@ -213,27 +221,17 @@ ${userMessage}
   }
 }
 
-/** For category reading (used by geminiService). Uses same model and fetch. */
+/**
+ * Category reading (used by reading/chat services).
+ * Merges `systemInstruction` + `prompt` into one message; request body has no systemInstruction field.
+ */
 export async function generateSajuCategoryReading(params: {
   systemInstruction: string;
   prompt: string;
 }): Promise<string> {
   const fn = "generateSajuCategoryReading";
   try {
-    const apiKey = getApiKey();
-    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: params.prompt }] }],
-        systemInstruction: params.systemInstruction ? { parts: [{ text: params.systemInstruction }] } : undefined,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-      }),
-    });
-    if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
-    const data = await res.json();
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    const text = typeof raw === "string" ? raw.trim() : "";
+    const text = await callGemini(params.prompt, params.systemInstruction);
     return normalizeResponse(text, "");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
