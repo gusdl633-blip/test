@@ -16,6 +16,13 @@ export default defineConfig(({ mode }) => {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+      // Proxy /api/gemini to `vercel dev` (default :3000) when running `npm run dev` alone.
+      proxy: {
+        '/api/gemini': {
+          target: process.env.VERCEL_DEV_API_URL || 'http://127.0.0.1:3000',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

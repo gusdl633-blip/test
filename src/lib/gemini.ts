@@ -1,20 +1,8 @@
 /**
- * Gemini API integration (frontend only).
- * API key: import.meta.env.VITE_GEMINI_API_KEY
- * No app backend HTTP routes — only Gemini REST from the browser.
+ * Gemini via Vercel API only (`/api/gemini`). No API key in the browser.
  */
 
-/** Model id for REST v1 generateContent (must exist for your API key). */
-export const GEMINI_MODEL_ID = "gemini-2.5-flash";
-
-/**
- * Full generateContent URL (API key is appended as `?key=` at request time).
- * @temporary DEBUG — also logged in dev on each Gemini call.
- */
-export const GEMINI_GENERATE_CONTENT_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL_ID}:generateContent`;
-
-/** @temporary DEBUG — app source has no fetch to local /api/saju; Gemini only. */
-export const RUNTIME_FETCHES_API_SAJU = false as const;
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export type SajuData = {
   name?: string;
@@ -42,9 +30,6 @@ const ELEMENT_LABELS: Record<string, string> = {
   water: "수",
 };
 
-// --- Helpers ---
-
-/** Convert element counts to readable Korean text. Example: "목 1, 화 2, 토 0, 금 3, 수 2" */
 function formatElements(
   elements: Record<string, number> | { wood: number; fire: number; earth: number; metal: number; water: number }
 ): string {
@@ -57,19 +42,16 @@ function formatElements(
   return parts.join(", ");
 }
 
-/** Format pillar for prompt. Example: "년주 갑자, 월주 병인, 일주 무진, 시주 경술" */
 function formatPillar(pillar: { year: string; month: string; day: string; hour: string }): string {
   return `년주 ${pillar.year}, 월주 ${pillar.month}, 일주 ${pillar.day}, 시주 ${pillar.hour}`;
 }
 
-/** Format recent conversation (at most 6 messages). */
 function formatHistory(history: ChatHistoryItem[]): string {
   const recent = history.slice(-6);
   if (recent.length === 0) return "(이전 대화 없음)";
   return recent.map((h) => `${h.role}: ${h.text}`).join("\n");
 }
 
-/** Trim, collapse blank lines, strip leading boilerplate; return fallback if empty. */
 function normalizeResponse(text: string, fallback: string): string {
   if (typeof text !== "string") return fallback;
   let t = text.trim();
@@ -79,59 +61,39 @@ function normalizeResponse(text: string, fallback: string): string {
   return t.length > 0 ? t : fallback;
 }
 
-function getApiKey(): string {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (typeof key !== "string" || !key.trim()) {
-    throw new Error("VITE_GEMINI_API_KEY is not set");
-  }
-  return key.trim();
-}
-
-/**
- * REST v1 generateContent rejects top-level `systemInstruction` for this stack; merge rules into the user text.
- */
-function mergeSystemAndUserPrompt(userPrompt: string, systemRules?: string): string {
-  const trimmed = systemRules?.trim();
-  if (!trimmed) return userPrompt;
-  return `[시스템 규칙]\n${trimmed}\n\n[사용자 데이터]\n${userPrompt}`;
-}
+type GeminiApiOk = { text?: string; raw?: unknown };
+type GeminiApiErr = { error?: string; details?: string };
 
 async function callGemini(prompt: string, systemInstruction?: string): Promise<string> {
-  const apiKey = getApiKey();
-  const fullPrompt = mergeSystemAndUserPrompt(prompt, systemInstruction);
-  const body = {
-    contents: [{ parts: [{ text: fullPrompt }] }],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048,
-    },
-  };
-
-  if (import.meta.env.DEV) {
-    console.info("[SAJU][debug] Gemini POST (exact path, no key):", GEMINI_GENERATE_CONTENT_URL);
-    console.info("[SAJU][debug] App runtime fetch /api/saju:", RUNTIME_FETCHES_API_SAJU, "(must stay false)");
-  }
-
-  const res = await fetch(`${GEMINI_GENERATE_CONTENT_URL}?key=${encodeURIComponent(apiKey)}`, {
+  const res = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      prompt,
+      systemInstruction,
+      model: DEFAULT_MODEL,
+      temperature: 0.7,
+      maxOutputTokens: 2048,
+    }),
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    try {
-      const errJson = JSON.parse(errText);
-      throw new Error(errJson?.error?.message || errText);
-    } catch (e) {
-      if (e instanceof Error && e.message !== errText) throw e;
-      throw new Error(`Gemini API error: ${res.status}`);
-    }
+  const rawText = await res.text();
+  let json: unknown;
+  try {
+    json = JSON.parse(rawText) as unknown;
+  } catch {
+    throw new Error(`/api/gemini: invalid JSON (${res.status}): ${rawText.slice(0, 200)}`);
   }
 
-  const data = await res.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  return typeof raw === "string" ? raw.trim() : "";
+  if (!res.ok) {
+    const err = json as GeminiApiErr;
+    const msg = [err?.error, err?.details].filter(Boolean).join(": ") || rawText.slice(0, 300);
+    throw new Error(msg || `Gemini proxy error: ${res.status}`);
+  }
+
+  const ok = json as GeminiApiOk;
+  const text = ok.text;
+  return typeof text === "string" ? text.trim() : "";
 }
 
 const SUMMARY_SYSTEM =
@@ -140,10 +102,6 @@ const SUMMARY_SYSTEM =
 const CHAT_SYSTEM =
   "너는 사주 상담 챗봇이다. 반드시 사용자의 사주 정보와 최근 대화 맥락에 근거해서만 답한다. 같은 표현과 같은 결론을 반복하지 않는다. 추상적인 위로보다 구체적인 해석을 우선한다. 답변은 자연스러운 한국어 상담체로 작성한다. 필요하면 조심스럽게 가능성과 경향으로 표현한다.";
 
-/**
- * Generate saju summary from calculated saju data.
- * System rules are merged into the prompt (no separate systemInstruction field in the API body).
- */
 export async function generateSajuSummary(sajuData: SajuData): Promise<string> {
   const fn = "generateSajuSummary";
   try {
@@ -184,10 +142,6 @@ ${lines.join("\n")}
   }
 }
 
-/**
- * Generate chat reply using saju data and conversation history.
- * System rules are merged into the prompt (no separate systemInstruction field in the API body).
- */
 export async function generateSajuChatReply(
   sajuData: SajuData,
   userMessage: string,
@@ -235,10 +189,6 @@ ${userMessage}
   }
 }
 
-/**
- * Category reading (used by reading/chat services).
- * Merges `systemInstruction` + `prompt` into one message; request body has no systemInstruction field.
- */
 export async function generateSajuCategoryReading(params: {
   systemInstruction: string;
   prompt: string;
@@ -254,5 +204,4 @@ export async function generateSajuCategoryReading(params: {
   }
 }
 
-/** Re-export for geminiService (history format user | model). */
 export type GeminiMessage = { role: "user" | "model"; text: string };
