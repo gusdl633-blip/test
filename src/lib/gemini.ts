@@ -64,13 +64,25 @@ function normalizeResponse(text: string, fallback: string): string {
 type GeminiApiOk = { text?: string; raw?: unknown };
 type GeminiApiErr = { error?: string; details?: string };
 
-async function callGemini(prompt: string, systemInstruction?: string): Promise<string> {
+async function callGemini(prompt: unknown, systemInstruction?: string): Promise<string> {
+  console.log("[DEBUG] callGemini prompt:", prompt);
+
+  let promptStr = prompt === null || prompt === undefined ? "" : String(prompt);
+  if (!promptStr.trim()) {
+    promptStr = "기본 사주 해석을 생성해라.";
+  }
+
+  const si =
+    systemInstruction === null || systemInstruction === undefined
+      ? ""
+      : String(systemInstruction);
+
   const res = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      prompt,
-      systemInstruction,
+      prompt: promptStr,
+      systemInstruction: si,
       model: DEFAULT_MODEL,
       temperature: 0.7,
       maxOutputTokens: 2048,
@@ -195,6 +207,7 @@ export async function generateSajuCategoryReading(params: {
 }): Promise<string> {
   const fn = "generateSajuCategoryReading";
   try {
+    console.log("[DEBUG] params.prompt:", params.prompt);
     const text = await callGemini(params.prompt, params.systemInstruction);
     return normalizeResponse(text, "");
   } catch (e) {

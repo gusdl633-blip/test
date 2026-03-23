@@ -355,12 +355,22 @@ ${JSON.stringify(core, null, 2)}
 }
 `;
 
+  console.log("[DEBUG] categoryPrompt:", categoryPrompt);
+
+  let finalPrompt = categoryPrompt;
+  if (!finalPrompt || !finalPrompt.trim()) {
+    finalPrompt = `[카테고리]\nid: ${categoryId}\nlabel: ${label}\n지시: ${prompt}\n\n[핵심 데이터]\n${JSON.stringify(core, null, 2)}\n\n반드시 스키마에 맞는 JSON만 반환해라.`;
+  }
+
+  const readingParams = {
+    systemInstruction: SAJU_PERSONA_SYSTEM,
+    prompt: finalPrompt,
+  };
+  console.log("[DEBUG] params.prompt:", readingParams.prompt);
+
   let raw = "";
   try {
-    raw = await generateSajuCategoryReading({
-      systemInstruction: SAJU_PERSONA_SYSTEM,
-      prompt: categoryPrompt,
-    });
+    raw = await generateSajuCategoryReading(readingParams);
   } catch (error) {
     console.error("[sajuReadingService/getReading] failed:", error);
   }
