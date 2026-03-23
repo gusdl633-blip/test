@@ -365,6 +365,7 @@ ${JSON.stringify(core, null, 2)}
   const readingParams = {
     systemInstruction: SAJU_PERSONA_SYSTEM,
     prompt: finalPrompt,
+    jsonMode: true as const,
   };
   console.log("[DEBUG] params.prompt:", readingParams.prompt);
 

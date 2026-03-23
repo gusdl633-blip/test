@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const UPSTREAM = "https://generativelanguage.googleapis.com/v1/models";
+/** v1beta supports JSON mode; mime/schema fields use snake_case in the REST body. */
+const UPSTREAM = "https://generativelanguage.googleapis.com/v1beta/models";
 
 type GeminiProxyBody = {
   prompt?: string;
@@ -8,6 +9,11 @@ type GeminiProxyBody = {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  /** When true, upstream gets response_mime_type application/json (category reading). */
+  jsonMode?: boolean;
+  /** Optional OpenAPI-style schema; sent upstream as response_schema when jsonMode. */
+  responseSchema?: unknown;
+  response_schema?: unknown;
 };
 
 function mergePrompt(prompt: string, systemInstruction?: string): string {
@@ -37,6 +43,11 @@ function safePreview(value: unknown, maxLen = 120): string {
   } catch {
     return "";
   }
+}
+
+function isJsonModeEnabled(parsed: unknown): boolean {
+  const v = (parsed as { jsonMode?: unknown })?.jsonMode;
+  return v === true || v === "true";
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -116,6 +127,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     maxOutputTokens = 2048,
   } = (parsedBody ?? {}) as Partial<GeminiProxyBody>;
 
+  const jsonMode = isJsonModeEnabled(parsedBody);
+
+  const responseSchemaRaw =
+    (parsedBody as Partial<GeminiProxyBody>)?.responseSchema ??
+    (parsedBody as Partial<GeminiProxyBody>)?.response_schema;
+
   const promptStr = typeof prompt === "string" ? prompt : "";
   const systemInstructionStr = typeof systemInstruction === "string" ? systemInstruction : "";
   const modelStr = typeof model === "string" && model.trim() ? model.trim() : "gemini-2.5-flash";
@@ -144,19 +161,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const fullPrompt = mergePrompt(promptStr, systemInstructionStr);
 
-  const upstreamUrl = `${UPSTREAM}/${encodeURIComponent(modelStr)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const upstreamPath = `${UPSTREAM}/${encodeURIComponent(modelStr)}:generateContent`;
+  const upstreamUrl = `${upstreamPath}?key=${encodeURIComponent(apiKey)}`;
 
-  const generationConfig = {
+  /** Per REST docs: generationConfig wrapper; response MIME/schema use snake_case keys. */
+  const generationConfig: Record<string, unknown> = {
     temperature: temperatureNum,
     maxOutputTokens: maxOutputTokensNum,
-    responseMimeType: "application/json" as const,
   };
 
+  if (jsonMode) {
+    generationConfig.response_mime_type = "application/json";
+    if (
+      responseSchemaRaw !== null &&
+      responseSchemaRaw !== undefined &&
+      typeof responseSchemaRaw === "object" &&
+      !Array.isArray(responseSchemaRaw)
+    ) {
+      generationConfig.response_schema = responseSchemaRaw;
+    }
+  }
+
   // Temporary: remove after verifying JSON mode in production
-  console.log(
-    "[DEBUG][api/gemini] upstream generationConfig.responseMimeType:",
-    generationConfig.responseMimeType ?? "(missing)"
-  );
+  console.log("[DEBUG][api/gemini] upstream URL:", upstreamPath);
+  console.log("[DEBUG][api/gemini] jsonMode:", jsonMode);
 
   let upstreamRes: Response;
   try {
@@ -175,6 +203,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const rawText = await upstreamRes.text();
+
+  // Temporary: remove after verifying JSON mode in production
+  console.log("[DEBUG][api/gemini] upstream response (first 200 chars):", rawText.slice(0, 200));
+
   let raw: unknown = rawText;
   try {
     raw = JSON.parse(rawText) as unknown;
@@ -199,9 +231,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   };
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   const outText = typeof text === "string" ? text : "";
-
-  // Temporary: remove after verifying JSON mode in production
-  console.log("[DEBUG][api/gemini] upstream model text (first 200 chars):", outText.slice(0, 200));
 
   res.status(200).json({ text: outText, raw });
 }

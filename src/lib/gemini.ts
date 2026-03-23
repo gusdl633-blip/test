@@ -64,7 +64,17 @@ function normalizeResponse(text: string, fallback: string): string {
 type GeminiApiOk = { text?: string; raw?: unknown };
 type GeminiApiErr = { error?: string; details?: string };
 
-async function callGemini(prompt: unknown, systemInstruction?: string): Promise<string> {
+type CallGeminiOptions = {
+  /** When true, proxy enables upstream JSON MIME mode (category reading). */
+  jsonMode?: boolean;
+  responseSchema?: unknown;
+};
+
+async function callGemini(
+  prompt: unknown,
+  systemInstruction?: string,
+  options?: CallGeminiOptions
+): Promise<string> {
   console.log("[DEBUG] callGemini prompt:", prompt);
 
   let promptStr = prompt === null || prompt === undefined ? "" : String(prompt);
@@ -77,16 +87,22 @@ async function callGemini(prompt: unknown, systemInstruction?: string): Promise<
       ? ""
       : String(systemInstruction);
 
+  const body: Record<string, unknown> = {
+    prompt: promptStr,
+    systemInstruction: si,
+    model: DEFAULT_MODEL,
+    temperature: 0.7,
+    maxOutputTokens: 2048,
+  };
+  if (options?.jsonMode === true) {
+    body.jsonMode = true;
+    if (options.responseSchema != null) body.responseSchema = options.responseSchema;
+  }
+
   const res = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: promptStr,
-      systemInstruction: si,
-      model: DEFAULT_MODEL,
-      temperature: 0.7,
-      maxOutputTokens: 2048,
-    }),
+    body: JSON.stringify(body),
   });
 
   const rawText = await res.text();
@@ -204,11 +220,17 @@ ${userMessage}
 export async function generateSajuCategoryReading(params: {
   systemInstruction: string;
   prompt: string;
+  /** Opt-in: upstream JSON MIME mode (category reading). Chat reuses this with plain text — omit or false. */
+  jsonMode?: boolean;
+  responseSchema?: unknown;
 }): Promise<string> {
   const fn = "generateSajuCategoryReading";
   try {
     console.log("[DEBUG] params.prompt:", params.prompt);
-    const text = await callGemini(params.prompt, params.systemInstruction);
+    const text = await callGemini(params.prompt, params.systemInstruction, {
+      jsonMode: params.jsonMode === true,
+      responseSchema: params.responseSchema,
+    });
     return normalizeResponse(text, "");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
