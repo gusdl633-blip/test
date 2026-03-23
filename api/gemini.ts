@@ -146,6 +146,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const upstreamUrl = `${UPSTREAM}/${encodeURIComponent(modelStr)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  const generationConfig = {
+    temperature: temperatureNum,
+    maxOutputTokens: maxOutputTokensNum,
+    responseMimeType: "application/json" as const,
+  };
+
+  // Temporary: remove after verifying JSON mode in production
+  console.log(
+    "[DEBUG][api/gemini] upstream generationConfig.responseMimeType:",
+    generationConfig.responseMimeType ?? "(missing)"
+  );
+
   let upstreamRes: Response;
   try {
     upstreamRes = await fetch(upstreamUrl, {
@@ -153,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { temperature: temperatureNum, maxOutputTokens: maxOutputTokensNum },
+        generationConfig,
       }),
     });
   } catch (e) {
@@ -187,6 +199,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   };
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   const outText = typeof text === "string" ? text : "";
+
+  // Temporary: remove after verifying JSON mode in production
+  console.log("[DEBUG][api/gemini] upstream model text (first 200 chars):", outText.slice(0, 200));
 
   res.status(200).json({ text: outText, raw });
 }
